@@ -9,7 +9,6 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "AI Assistant",
   description: "Your comprehensive AI assistant for daily productivity",
-    generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -19,6 +18,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+          <link rel="icon" href="/favicon.ico" sizes="any" />
+          <title>AI Assistant</title>
+        </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
