@@ -20,7 +20,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
           <link rel="icon" href="/favicon.ico" sizes="any" />
-          <title>AI Assistant</title>
+          <title>Thea</title>
         </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
