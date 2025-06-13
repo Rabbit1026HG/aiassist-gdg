@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Brain, Calendar, MessageSquare, Clock, Shield, Sparkles, Zap, Globe } from "lucide-react"
+import Image from "next/image"
 
 export function LandingPage() {
   return (
@@ -11,13 +12,7 @@ export function LandingPage() {
       <header className="border-b border-slate-200/50 dark:border-slate-700/50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container flex items-center justify-between py-4">
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <Brain className="h-8 w-8 text-violet-600 dark:text-violet-400" />
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-violet-600 to-emerald-600 bg-clip-text text-transparent">
-              AI Assistant
-            </span>
+            <Image src="/logo.svg" alt="Thea Logo" width={90}  height={0}  />
           </div>
           <div className="flex items-center gap-4">
             <ModeToggle />
@@ -191,11 +186,8 @@ export function LandingPage() {
         <div className="container py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Brain className="h-6 w-6 text-violet-600 dark:text-violet-400" />
-              <span className="font-semibold bg-gradient-to-r from-violet-600 to-emerald-600 bg-clip-text text-transparent">
-                AI Assistant
-              </span>
-            </div>
+            <Image src="/logo.svg" alt="Thea Logo" width={65}  height={0} />
+          </div>
             <div className="text-center text-sm text-slate-500 dark:text-slate-400">
               Empowering productivity through intelligent automation
             </div>
