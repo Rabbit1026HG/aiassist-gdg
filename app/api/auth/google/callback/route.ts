@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { realGoogleCalendar } from "@/lib/google-calendar-real"
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -15,13 +14,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    await realGoogleCalendar.exchangeCodeForTokens(code)
-
-    // In a real app, you'd store the tokens securely (database, encrypted cookies, etc.)
-    // For now, we'll redirect back to calendar with success
-    return NextResponse.redirect(new URL("/dashboard/calendar?connected=true", request.url))
+    // The token exchange will be handled on the client side
+    // since we need to store tokens in localStorage
+    return NextResponse.redirect(new URL(`/dashboard/calendar?code=${code}`, request.url))
   } catch (error) {
     console.error("OAuth callback error:", error)
-    return NextResponse.redirect(new URL("/dashboard/calendar?error=token_exchange_failed", request.url))
+    return NextResponse.redirect(new URL("/dashboard/calendar?error=callback_failed", request.url))
   }
 }
