@@ -1,169 +1,188 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Plus, CalendarIcon, Clock, MapPin, Users, Loader2 } from "lucide-react"
-import { EventModal } from "@/components/calendar/event-modal"
-import type { CalendarEvent } from "@/lib/google-calendar"
-import { cn } from "@/lib/utils"
-import { calendarService } from "@/lib/calendar-service"
-import { CalendarDebugPanel } from "@/components/calendar/debug-panel"
-import { GoogleCalendarAuthPanel } from "@/components/calendar/auth-panel"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  CalendarIcon,
+  Clock,
+  MapPin,
+  Users,
+  Loader2,
+} from "lucide-react";
+import { EventModal } from "@/components/calendar/event-modal";
+import type { CalendarEvent } from "@/lib/google-calendar";
+import { cn } from "@/lib/utils";
+import { calendarService } from "@/lib/calendar-service";
+import { CalendarDebugPanel } from "@/components/calendar/debug-panel";
+import { GoogleCalendarAuthPanel } from "@/components/calendar/auth-panel";
 
 export function CalendarView() {
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<"month" | "week" | "day">("month")
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>()
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [view, setView] = useState<"month" | "week" | "day">("month");
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    loadEventsForCurrentMonth()
-  }, [currentDate, view]) // Add 'view' dependency to reload when view changes
+    loadEventsForCurrentMonth();
+  }, [currentDate, view]); // Add 'view' dependency to reload when view changes
 
   // Handle OAuth callback
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const code = urlParams.get("code")
-    const error = urlParams.get("error")
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get("code");
+    const error = urlParams.get("error");
 
     if (code && calendarService.getDataSource() === "real") {
       // Exchange code for tokens
       calendarService
         .exchangeCodeForTokens(code)
         .then(() => {
-          console.log("Successfully authenticated with Google Calendar")
+          console.log("Successfully authenticated with Google Calendar");
           // Clean up URL
-          window.history.replaceState({}, document.title, window.location.pathname)
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
           // Reload events
-          loadEventsForCurrentMonth()
+          loadEventsForCurrentMonth();
         })
         .catch((err) => {
-          console.error("Failed to exchange code for tokens:", err)
-        })
+          console.error("Failed to exchange code for tokens:", err);
+        });
     }
 
     if (error) {
-      console.error("OAuth error:", error)
+      console.error("OAuth error:", error);
       // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname)
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [])
+  }, []);
 
   const loadEventsForCurrentMonth = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       // Check authentication for real data source
       if (calendarService.getDataSource() === "real") {
-        const authState = calendarService.getAuthState()
+        const authState = calendarService.getAuthState();
         if (!authState?.isAuthenticated) {
-          console.log("Not authenticated, skipping API call")
-          setEvents([])
-          setIsLoading(false)
-          return
+          console.log("Not authenticated, skipping API call");
+          setEvents([]);
+          setIsLoading(false);
+          return;
         }
       }
 
       // Calculate time range based on current view and date
-      const { timeMin, timeMax } = getTimeRange()
+      const { timeMin, timeMax } = getTimeRange();
 
-      console.log(`Loading events for ${view} view:`, { timeMin, timeMax })
-      const calendarEvents = await calendarService.getEvents(timeMin, timeMax)
-      setEvents(calendarEvents)
+      console.log(`Loading events for ${view} view:`, { timeMin, timeMax });
+      const calendarEvents = await calendarService.getEvents(timeMin, timeMax);
+      setEvents(calendarEvents);
     } catch (error) {
-      console.error("Error loading events:", error)
+      console.error("Error loading events:", error);
       // Show user-friendly error message
-      setEvents([])
+      setEvents([]);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const getTimeRange = () => {
-    const now = new Date(currentDate)
-    let timeMin: string
-    let timeMax: string
+    const now = new Date(currentDate);
+    let timeMin: string;
+    let timeMax: string;
 
     switch (view) {
       case "month":
         // Get first day of the month
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
         // Get last day of the month
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-        timeMin = firstDay.toISOString()
-        timeMax = lastDay.toISOString()
-        break
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        timeMin = firstDay.toISOString();
+        timeMax = lastDay.toISOString();
+        break;
 
       case "week":
         // Get start of week (Sunday)
-        const weekStart = new Date(now)
-        weekStart.setDate(now.getDate() - now.getDay())
-        weekStart.setHours(0, 0, 0, 0)
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay());
+        weekStart.setHours(0, 0, 0, 0);
 
         // Get end of week (Saturday)
-        const weekEnd = new Date(weekStart)
-        weekEnd.setDate(weekStart.getDate() + 6)
-        weekEnd.setHours(23, 59, 59, 999)
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
 
-        timeMin = weekStart.toISOString()
-        timeMax = weekEnd.toISOString()
-        break
+        timeMin = weekStart.toISOString();
+        timeMax = weekEnd.toISOString();
+        break;
 
       case "day":
         // Get start of day
-        const dayStart = new Date(now)
-        dayStart.setHours(0, 0, 0, 0)
+        const dayStart = new Date(now);
+        dayStart.setHours(0, 0, 0, 0);
 
         // Get end of day
-        const dayEnd = new Date(now)
-        dayEnd.setHours(23, 59, 59, 999)
+        const dayEnd = new Date(now);
+        dayEnd.setHours(23, 59, 59, 999);
 
-        timeMin = dayStart.toISOString()
-        timeMax = dayEnd.toISOString()
-        break
+        timeMin = dayStart.toISOString();
+        timeMax = dayEnd.toISOString();
+        break;
 
       default:
         // Default to current month
-        const defaultFirst = new Date(now.getFullYear(), now.getMonth(), 1)
-        const defaultLast = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-        timeMin = defaultFirst.toISOString()
-        timeMax = defaultLast.toISOString()
+        const defaultFirst = new Date(now.getFullYear(), now.getMonth(), 1);
+        const defaultLast = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        timeMin = defaultFirst.toISOString();
+        timeMax = defaultLast.toISOString();
     }
 
-    return { timeMin, timeMax }
-  }
+    return { timeMin, timeMax };
+  };
 
   const handleEventCreated = () => {
-    loadEventsForCurrentMonth() // Use the new function name
-  }
+    loadEventsForCurrentMonth(); // Use the new function name
+  };
 
   const getDaysInMonth = (year: number, month: number) => {
-    return new Date(year, month + 1, 0).getDate()
-  }
+    return new Date(year, month + 1, 0).getDate();
+  };
 
   const getFirstDayOfMonth = (year: number, month: number) => {
-    return new Date(year, month, 1).getDay()
-  }
+    return new Date(year, month, 1).getDay();
+  };
 
   const getEventsForDate = (date: Date) => {
     return events.filter((event) => {
-      const eventDate = new Date(event.start.dateTime)
-      return eventDate.toDateString() === date.toDateString()
-    })
-  }
+      const eventDate = new Date(event.start.dateTime);
+      return eventDate.toDateString() === date.toDateString();
+    });
+  };
 
   const formatTime = (dateTime: string) => {
     return new Date(dateTime).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,
-    })
-  }
+    });
+  };
 
   const getEventColor = (index: number) => {
     const colors = [
@@ -173,18 +192,18 @@ export function CalendarView() {
       "bg-gradient-to-r from-pink-500 to-rose-500",
       "bg-gradient-to-r from-blue-500 to-cyan-500",
       "bg-gradient-to-r from-indigo-500 to-purple-500",
-    ]
-    return colors[index % colors.length]
-  }
+    ];
+    return colors[index % colors.length];
+  };
 
   const renderMonthView = () => {
-    const year = currentDate.getFullYear()
-    const month = currentDate.getMonth()
-    const daysInMonth = getDaysInMonth(year, month)
-    const firstDay = getFirstDayOfMonth(year, month)
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = getDaysInMonth(year, month);
+    const firstDay = getFirstDayOfMonth(year, month);
 
-    const days = []
-    const today = new Date()
+    const days = [];
+    const today = new Date();
 
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDay; i++) {
@@ -192,15 +211,18 @@ export function CalendarView() {
         <div
           key={`empty-${i}`}
           className="h-24 md:h-32 border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50"
-        />,
-      )
+        />
+      );
     }
 
     // Add cells for each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day)
-      const isToday = today.getDate() === day && today.getMonth() === month && today.getFullYear() === year
-      const dayEvents = getEventsForDate(date)
+      const date = new Date(year, month, day);
+      const isToday =
+        today.getDate() === day &&
+        today.getMonth() === month &&
+        today.getFullYear() === year;
+      const dayEvents = getEventsForDate(date);
 
       days.push(
         <div
@@ -208,11 +230,11 @@ export function CalendarView() {
           className={cn(
             "h-24 md:h-32 border border-slate-200 dark:border-slate-700 p-1 md:p-2 cursor-pointer transition-all duration-200 hover:bg-slate-50 dark:hover:bg-slate-800/50",
             isToday &&
-              "bg-gradient-to-br from-violet-50 to-emerald-50 dark:from-violet-900/20 dark:to-emerald-900/20 border-violet-300 dark:border-violet-600",
+              "bg-gradient-to-br from-violet-50 to-emerald-50 dark:from-violet-900/20 dark:to-emerald-900/20 border-violet-300 dark:border-violet-600"
           )}
           onClick={() => {
-            setSelectedDate(date)
-            setIsModalOpen(true)
+            setSelectedDate(date);
+            setIsModalOpen(true);
           }}
         >
           <div className="flex justify-between items-start mb-1">
@@ -221,7 +243,7 @@ export function CalendarView() {
                 "text-sm font-medium",
                 isToday
                   ? "bg-gradient-to-r from-violet-600 to-emerald-600 text-white rounded-full w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-xs md:text-sm font-bold"
-                  : "text-slate-700 dark:text-slate-300",
+                  : "text-slate-700 dark:text-slate-300"
               )}
             >
               {day}
@@ -242,19 +264,26 @@ export function CalendarView() {
             {dayEvents.slice(0, 3).map((event, index) => (
               <div
                 key={event.id}
-                className={cn("text-xs p-1 rounded text-white truncate animate-fade-in", getEventColor(index))}
+                className={cn(
+                  "text-xs p-1 rounded text-white truncate animate-fade-in",
+                  getEventColor(index)
+                )}
                 title={`${event.title} - ${formatTime(event.start.dateTime)}`}
               >
                 <div className="font-medium truncate">{event.title}</div>
-                <div className="text-xs opacity-90">{formatTime(event.start.dateTime)}</div>
+                <div className="text-xs opacity-90">
+                  {formatTime(event.start.dateTime)}
+                </div>
               </div>
             ))}
             {dayEvents.length > 3 && (
-              <div className="text-xs text-slate-500 dark:text-slate-400 px-1">+{dayEvents.length - 3} more</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 px-1">
+                +{dayEvents.length - 3} more
+              </div>
             )}
           </div>
-        </div>,
-      )
+        </div>
+      );
     }
 
     return (
@@ -270,19 +299,19 @@ export function CalendarView() {
         ))}
         {days}
       </div>
-    )
-  }
+    );
+  };
 
   const renderWeekView = () => {
     const weekEvents = events.filter((event) => {
-      const eventDate = new Date(event.start.dateTime)
-      const weekStart = new Date(currentDate)
-      weekStart.setDate(currentDate.getDate() - currentDate.getDay())
-      const weekEnd = new Date(weekStart)
-      weekEnd.setDate(weekStart.getDate() + 6)
+      const eventDate = new Date(event.start.dateTime);
+      const weekStart = new Date(currentDate);
+      weekStart.setDate(currentDate.getDate() - currentDate.getDay());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
 
-      return eventDate >= weekStart && eventDate <= weekEnd
-    })
+      return eventDate >= weekStart && eventDate <= weekEnd;
+    });
 
     return (
       <div className="space-y-4">
@@ -294,9 +323,16 @@ export function CalendarView() {
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className={cn("w-3 h-3 rounded-full mt-2 flex-shrink-0", getEventColor(index))} />
+                  <div
+                    className={cn(
+                      "w-3 h-3 rounded-full mt-2 flex-shrink-0",
+                      getEventColor(index)
+                    )}
+                  />
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">{event.title}</h3>
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                      {event.title}
+                    </h3>
                     {event.description && (
                       <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 line-clamp-2">
                         {event.description}
@@ -305,7 +341,8 @@ export function CalendarView() {
                     <div className="flex flex-col gap-1 mt-2 text-xs text-slate-500 dark:text-slate-400">
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {formatTime(event.start.dateTime)} - {formatTime(event.end.dateTime)}
+                        {formatTime(event.start.dateTime)} -{" "}
+                        {formatTime(event.end.dateTime)}
                       </div>
                       {event.location && (
                         <div className="flex items-center gap-1">
@@ -316,7 +353,8 @@ export function CalendarView() {
                       {event.attendees && event.attendees.length > 0 && (
                         <div className="flex items-center gap-1">
                           <Users className="h-3 w-3" />
-                          {event.attendees.length} attendee{event.attendees.length > 1 ? "s" : ""}
+                          {event.attendees.length} attendee
+                          {event.attendees.length > 1 ? "s" : ""}
                         </div>
                       )}
                     </div>
@@ -329,15 +367,17 @@ export function CalendarView() {
         {weekEvents.length === 0 && (
           <div className="text-center py-12">
             <CalendarIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-            <p className="text-slate-500 dark:text-slate-400">No events scheduled for this week</p>
+            <p className="text-slate-500 dark:text-slate-400">
+              No events scheduled for this week
+            </p>
           </div>
         )}
       </div>
-    )
-  }
+    );
+  };
 
   const renderDayView = () => {
-    const dayEvents = getEventsForDate(currentDate)
+    const dayEvents = getEventsForDate(currentDate);
 
     return (
       <div className="space-y-4">
@@ -351,27 +391,41 @@ export function CalendarView() {
             })}
           </h3>
           <p className="text-slate-600 dark:text-slate-300">
-            {dayEvents.length} event{dayEvents.length !== 1 ? "s" : ""} scheduled
+            {dayEvents.length} event{dayEvents.length !== 1 ? "s" : ""}{" "}
+            scheduled
           </p>
         </div>
 
         <div className="space-y-3">
           {dayEvents.map((event, index) => (
-            <Card key={event.id} className="modern-card hover:shadow-xl transition-all duration-300 animate-fade-in">
+            <Card
+              key={event.id}
+              className="modern-card hover:shadow-xl transition-all duration-300 animate-fade-in"
+            >
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
-                  <div className={cn("w-4 h-4 rounded-full mt-1 flex-shrink-0", getEventColor(index))} />
+                  <div
+                    className={cn(
+                      "w-4 h-4 rounded-full mt-1 flex-shrink-0",
+                      getEventColor(index)
+                    )}
+                  />
                   <div className="flex-1">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{event.title}</h3>
+                      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                        {event.title}
+                      </h3>
                       <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
                         <Clock className="h-4 w-4" />
-                        {formatTime(event.start.dateTime)} - {formatTime(event.end.dateTime)}
+                        {formatTime(event.start.dateTime)} -{" "}
+                        {formatTime(event.end.dateTime)}
                       </div>
                     </div>
 
                     {event.description && (
-                      <p className="text-slate-600 dark:text-slate-300 mb-3">{event.description}</p>
+                      <p className="text-slate-600 dark:text-slate-300 mb-3">
+                        {event.description}
+                      </p>
                     )}
 
                     <div className="flex flex-wrap gap-4 text-sm text-slate-500 dark:text-slate-400">
@@ -384,7 +438,8 @@ export function CalendarView() {
                       {event.attendees && event.attendees.length > 0 && (
                         <div className="flex items-center gap-1">
                           <Users className="h-4 w-4" />
-                          {event.attendees.length} attendee{event.attendees.length > 1 ? "s" : ""}
+                          {event.attendees.length} attendee
+                          {event.attendees.length > 1 ? "s" : ""}
                         </div>
                       )}
                     </div>
@@ -398,11 +453,13 @@ export function CalendarView() {
         {dayEvents.length === 0 && (
           <div className="text-center py-12">
             <CalendarIcon className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-            <p className="text-slate-500 dark:text-slate-400">No events scheduled for this day</p>
+            <p className="text-slate-500 dark:text-slate-400">
+              No events scheduled for this day
+            </p>
             <Button
               onClick={() => {
-                setSelectedDate(currentDate)
-                setIsModalOpen(true)
+                setSelectedDate(currentDate);
+                setIsModalOpen(true);
               }}
               className="mt-4 bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white"
             >
@@ -412,39 +469,39 @@ export function CalendarView() {
           </div>
         )}
       </div>
-    )
-  }
+    );
+  };
 
   const navigatePrevious = () => {
-    const newDate = new Date(currentDate)
+    const newDate = new Date(currentDate);
     if (view === "month") {
-      newDate.setMonth(newDate.getMonth() - 1)
+      newDate.setMonth(newDate.getMonth() - 1);
     } else if (view === "week") {
-      newDate.setDate(newDate.getDate() - 7)
+      newDate.setDate(newDate.getDate() - 7);
     } else {
-      newDate.setDate(newDate.getDate() - 1)
+      newDate.setDate(newDate.getDate() - 1);
     }
-    setCurrentDate(newDate)
+    setCurrentDate(newDate);
     // Data will be loaded automatically via useEffect
-  }
+  };
 
   const navigateNext = () => {
-    const newDate = new Date(currentDate)
+    const newDate = new Date(currentDate);
     if (view === "month") {
-      newDate.setMonth(newDate.getMonth() + 1)
+      newDate.setMonth(newDate.getMonth() + 1);
     } else if (view === "week") {
-      newDate.setDate(newDate.getDate() + 7)
+      newDate.setDate(newDate.getDate() + 7);
     } else {
-      newDate.setDate(newDate.getDate() + 1)
+      newDate.setDate(newDate.getDate() + 1);
     }
-    setCurrentDate(newDate)
+    setCurrentDate(newDate);
     // Data will be loaded automatically via useEffect
-  }
+  };
 
   const navigateToday = () => {
-    setCurrentDate(new Date())
+    setCurrentDate(new Date());
     // Data will be loaded automatically via useEffect
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -461,10 +518,14 @@ export function CalendarView() {
           <div
             className={cn(
               "w-2 h-2 rounded-full",
-              calendarService.getDataSource() === "real" ? "bg-emerald-500" : "bg-amber-500",
+              calendarService.getDataSource() === "real"
+                ? "bg-emerald-500"
+                : "bg-amber-500"
             )}
           />
-          {calendarService.getDataSource() === "real" ? "Live Data" : "Test Data"}
+          {calendarService.getDataSource() === "real"
+            ? "Live Data"
+            : "Test Data"}
         </div>
         <Button
           onClick={() => setIsModalOpen(true)}
@@ -474,9 +535,13 @@ export function CalendarView() {
         </Button>
       </div>
 
-      {process.env.NODE_ENV === "development" && <CalendarDebugPanel onDataSourceChange={loadEventsForCurrentMonth} />}
+      {process.env.NODE_ENV === "development" && (
+        <CalendarDebugPanel onDataSourceChange={loadEventsForCurrentMonth} />
+      )}
 
-      {calendarService.getDataSource() === "real" && <GoogleCalendarAuthPanel onAuthChange={setIsAuthenticated} />}
+      {calendarService.getDataSource() === "real" && (
+        <GoogleCalendarAuthPanel onAuthChange={setIsAuthenticated} />
+      )}
 
       <Card className="modern-card">
         <CardContent className="p-4 md:p-6">
@@ -514,7 +579,12 @@ export function CalendarView() {
                 })}
               </h2>
             </div>
-            <Select value={view} onValueChange={(value) => setView(value as "month" | "week" | "day")}>
+            <Select
+              value={view}
+              onValueChange={(value) =>
+                setView(value as "month" | "week" | "day")
+              }
+            >
               <SelectTrigger className="w-32 border-2 border-slate-200 dark:border-slate-700 focus:border-violet-500 dark:focus:border-violet-400">
                 <SelectValue placeholder="View" />
               </SelectTrigger>
@@ -529,7 +599,9 @@ export function CalendarView() {
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
-              <span className="ml-2 text-slate-600 dark:text-slate-300">Loading calendar events...</span>
+              <span className="ml-2 text-slate-600 dark:text-slate-300">
+                Loading calendar events...
+              </span>
             </div>
           ) : (
             <>
@@ -548,5 +620,5 @@ export function CalendarView() {
         selectedDate={selectedDate}
       />
     </div>
-  )
+  );
 }
