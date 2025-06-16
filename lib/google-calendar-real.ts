@@ -58,11 +58,9 @@ class RealGoogleCalendarService {
     const params = new URLSearchParams({
       client_id:
         process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-        process.env.GOOGLE_CLIENT_ID ||
         "",
       redirect_uri:
         process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI ||
-        process.env.GOOGLE_REDIRECT_URI ||
         "",
       scope: "https://www.googleapis.com/auth/calendar",
       response_type: "code",
@@ -83,14 +81,12 @@ class RealGoogleCalendarService {
       body: new URLSearchParams({
         client_id:
           process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-          process.env.GOOGLE_CLIENT_ID ||
           "",
-        client_secret: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET || "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
         code,
         grant_type: "authorization_code",
         redirect_uri:
           process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI ||
-          process.env.GOOGLE_REDIRECT_URI ||
           "",
       }),
     });
@@ -103,7 +99,7 @@ class RealGoogleCalendarService {
     }
 
     const tokens = await response.json();
-
+console.log(tokens);
     this.accessToken = tokens.access_token;
     this.refreshToken = tokens.refresh_token;
     this.expiresAt = Date.now() + tokens.expires_in * 1000;
@@ -155,7 +151,6 @@ class RealGoogleCalendarService {
       body: new URLSearchParams({
         client_id:
           process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-          process.env.GOOGLE_CLIENT_ID ||
           "",
         client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
         refresh_token: this.refreshToken,
