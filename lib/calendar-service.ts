@@ -9,9 +9,9 @@ class CalendarService {
     this.dataSource = source
   }
 
-  getAuthState(): AuthState | null {
+  async getAuthState(): Promise<AuthState | null> {
     if (this.dataSource === "real") {
-      return realGoogleCalendar.getAuthState()
+      return await realGoogleCalendar.getAuthState()
     }
     return null
   }
@@ -25,15 +25,9 @@ class CalendarService {
     }
   }
 
-  async exchangeCodeForTokens(code: string): Promise<void> {
+  async clearAuthentication(): Promise<void> {
     if (this.dataSource === "real") {
-      await realGoogleCalendar.exchangeCodeForTokens(code)
-    }
-  }
-
-  clearAuthentication(): void {
-    if (this.dataSource === "real") {
-      realGoogleCalendar.clearTokens()
+      await realGoogleCalendar.clearAuthentication()
     }
   }
 
@@ -41,7 +35,7 @@ class CalendarService {
     try {
       if (this.dataSource === "real") {
         // Check authentication first
-        const authState = realGoogleCalendar.getAuthState()
+        const authState = await realGoogleCalendar.getAuthState()
         if (!authState.isAuthenticated) {
           throw new Error("Not authenticated with Google Calendar")
         }
@@ -65,7 +59,7 @@ class CalendarService {
   async createEvent(eventData: CreateEventData): Promise<CalendarEvent> {
     try {
       if (this.dataSource === "real") {
-        const authState = realGoogleCalendar.getAuthState()
+        const authState = await realGoogleCalendar.getAuthState()
         if (!authState.isAuthenticated) {
           throw new Error("Not authenticated with Google Calendar")
         }
@@ -87,7 +81,7 @@ class CalendarService {
   async updateEvent(eventId: string, eventData: Partial<CreateEventData>): Promise<CalendarEvent> {
     try {
       if (this.dataSource === "real") {
-        const authState = realGoogleCalendar.getAuthState()
+        const authState = await realGoogleCalendar.getAuthState()
         if (!authState.isAuthenticated) {
           throw new Error("Not authenticated with Google Calendar")
         }
@@ -109,7 +103,7 @@ class CalendarService {
   async deleteEvent(eventId: string): Promise<boolean> {
     try {
       if (this.dataSource === "real") {
-        const authState = realGoogleCalendar.getAuthState()
+        const authState = await realGoogleCalendar.getAuthState()
         if (!authState.isAuthenticated) {
           throw new Error("Not authenticated with Google Calendar")
         }

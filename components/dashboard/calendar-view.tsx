@@ -29,23 +29,15 @@ export function CalendarView() {
   // Handle OAuth callback
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
-    const code = urlParams.get("code")
+    const success = urlParams.get("success")
     const error = urlParams.get("error")
 
-    if (code && calendarService.getDataSource() === "real") {
-      // Exchange code for tokens
-      calendarService
-        .exchangeCodeForTokens(code)
-        .then(() => {
-          console.log("Successfully authenticated with Google Calendar")
-          // Clean up URL
-          window.history.replaceState({}, document.title, window.location.pathname)
-          // Reload events
-          loadEventsForCurrentMonth()
-        })
-        .catch((err) => {
-          console.error("Failed to exchange code for tokens:", err)
-        })
+    if (success === "authenticated") {
+      console.log("Successfully authenticated with Google Calendar")
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+      // Reload events
+      loadEventsForCurrentMonth()
     }
 
     if (error) {
@@ -60,7 +52,7 @@ export function CalendarView() {
     try {
       // Check authentication for real data source
       if (calendarService.getDataSource() === "real") {
-        const authState = calendarService.getAuthState()
+        const authState = await calendarService.getAuthState()
         if (!authState?.isAuthenticated) {
           console.log("Not authenticated, skipping API call")
           setEvents([])
