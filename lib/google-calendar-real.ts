@@ -82,7 +82,7 @@ class RealGoogleCalendarService {
         client_id:
           process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
           "",
-        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET ||process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET|| "",
         code,
         grant_type: "authorization_code",
         redirect_uri:
