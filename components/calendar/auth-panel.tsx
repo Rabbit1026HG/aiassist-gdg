@@ -4,8 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-// import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Alert, AlertDescription } from "../ui/alert"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { calendarService } from "@/lib/calendar-service"
 import type { AuthState } from "@/lib/google-calendar-real"
 import { Calendar, CheckCircle, AlertCircle, ExternalLink, RefreshCw } from "lucide-react"
@@ -23,8 +22,8 @@ export function GoogleCalendarAuthPanel({ onAuthChange }: AuthPanelProps) {
     checkAuthState()
   }, [])
 
-  const checkAuthState = () => {
-    const state = calendarService.getAuthState()
+  const checkAuthState = async () => {
+    const state = await calendarService.getAuthState()
     setAuthState(state)
     onAuthChange?.(state?.isAuthenticated || false)
   }
@@ -45,9 +44,9 @@ export function GoogleCalendarAuthPanel({ onAuthChange }: AuthPanelProps) {
     }
   }
 
-  const handleDisconnect = () => {
-    calendarService.clearAuthentication()
-    checkAuthState()
+  const handleDisconnect = async () => {
+    await calendarService.clearAuthentication()
+    await checkAuthState()
     setError(null)
   }
 

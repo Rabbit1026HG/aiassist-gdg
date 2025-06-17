@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { calendarService } from "@/lib/calendar-service"
+import { serverGoogleCalendar } from "@/lib/google-calendar-server"
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -8,7 +10,14 @@ export async function GET(request: NextRequest) {
 
     console.log("API: Fetching events with params:", { timeMin, timeMax })
 
-    const events = await calendarService.getEvents(timeMin || undefined, timeMax || undefined)
+    let events
+    if (calendarService.getDataSource() === "real") {
+      // Use server-side service for real data
+      events = await serverGoogleCalendar.getEvents(timeMin || undefined, timeMax || undefined)
+    } else {
+      // Use mock service for test data
+      events = await calendarService.getEvents(timeMin || undefined, timeMax || undefined)
+    }
 
     return NextResponse.json({
       events,
@@ -32,7 +41,14 @@ export async function POST(request: NextRequest) {
     const eventData = await request.json()
     console.log("API: Creating event:", eventData)
 
-    const newEvent = await calendarService.createEvent(eventData)
+    let newEvent
+    if (calendarService.getDataSource() === "real") {
+      // Use server-side service for real data
+      newEvent = await serverGoogleCalendar.createEvent(eventData)
+    } else {
+      // Use mock service for test data
+      newEvent = await calendarService.createEvent(eventData)
+    }
 
     return NextResponse.json(
       {
