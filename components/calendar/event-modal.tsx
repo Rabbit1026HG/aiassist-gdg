@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar, Clock, MapPin, Users, Sparkles } from "lucide-react"
 import { googleCalendar, type CreateEventData } from "@/lib/google-calendar"
+import { calendarService } from "@/lib/calendar-service"
 
 interface EventModalProps {
   isOpen: boolean
@@ -54,7 +55,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
         attendees: formData.attendees ? formData.attendees.split(",").map((email) => email.trim()) : undefined,
       }
 
-      await googleCalendar.createEvent(eventData)
+      await calendarService.createEvent(eventData)
       onEventCreated()
       onClose()
 
