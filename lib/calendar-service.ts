@@ -1,123 +1,74 @@
 import { CALENDAR_CONFIG, type CalendarDataSource } from "./calendar-config"
-import { googleCalendar, type CalendarEvent, type CreateEventData } from "./google-calendar"
-import { realGoogleCalendar, type AuthState } from "./google-calendar-real"
+import { realGoogleCalendar, type AuthState, type CalendarEvent, type CreateEventData } from "./google-calendar-real"
 
 class CalendarService {
-  private dataSource: CalendarDataSource = CALENDAR_CONFIG.dataSource as CalendarDataSource
+  private dataSource: CalendarDataSource = CALENDAR_CONFIG.dataSource
 
   setDataSource(source: CalendarDataSource) {
     this.dataSource = source
   }
 
   async getAuthState(): Promise<AuthState | null> {
-    if (this.dataSource === "real") {
-      return await realGoogleCalendar.getAuthState()
-    }
-    return null
+    return await realGoogleCalendar.getAuthState()
   }
 
   async authenticate(): Promise<string | boolean> {
-    if (this.dataSource === "real") {
-      return await realGoogleCalendar.authenticate()
-    } else {
-      // Mock authentication always succeeds
-      return true
-    }
+    return await realGoogleCalendar.authenticate()
   }
 
   async clearAuthentication(): Promise<void> {
-    if (this.dataSource === "real") {
-      await realGoogleCalendar.clearAuthentication()
-    }
+    await realGoogleCalendar.clearAuthentication()
   }
 
   async getEvents(timeMin?: string, timeMax?: string): Promise<CalendarEvent[]> {
     try {
-      if (this.dataSource === "real") {
-        // Check authentication first
-        const authState = await realGoogleCalendar.getAuthState()
-        if (!authState.isAuthenticated) {
-          throw new Error("Not authenticated with Google Calendar")
-        }
-        return await realGoogleCalendar.getEvents(timeMin, timeMax)
-      } else {
-        // Use mock data with simulated delay
-        await new Promise((resolve) => setTimeout(resolve, CALENDAR_CONFIG.mockDelay))
-        return await googleCalendar.getEvents(timeMin, timeMax)
+      // Check authentication first
+      const authState = await realGoogleCalendar.getAuthState()
+      if (!authState.isAuthenticated) {
+        throw new Error("Not authenticated with Google Calendar")
       }
+      return await realGoogleCalendar.getEvents(timeMin, timeMax)
     } catch (error) {
       console.error("Error fetching calendar events:", error)
-      // Fallback to mock data if real API fails
-      if (this.dataSource === "real") {
-        console.warn("Falling back to mock data due to API error")
-        return await googleCalendar.getEvents(timeMin, timeMax)
-      }
       throw error
     }
   }
 
   async createEvent(eventData: CreateEventData): Promise<CalendarEvent> {
     try {
-      if (this.dataSource === "real") {
-        const authState = await realGoogleCalendar.getAuthState()
-        if (!authState.isAuthenticated) {
-          throw new Error("Not authenticated with Google Calendar")
-        }
-        return await realGoogleCalendar.createEvent(eventData)
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, CALENDAR_CONFIG.mockDelay))
-        return await googleCalendar.createEvent(eventData)
+      const authState = await realGoogleCalendar.getAuthState()
+      if (!authState.isAuthenticated) {
+        throw new Error("Not authenticated with Google Calendar")
       }
+      return await realGoogleCalendar.createEvent(eventData)
     } catch (error) {
       console.error("Error creating calendar event:", error)
-      if (this.dataSource === "real") {
-        console.warn("Falling back to mock data due to API error")
-        return await googleCalendar.createEvent(eventData)
-      }
       throw error
     }
   }
 
   async updateEvent(eventId: string, eventData: Partial<CreateEventData>): Promise<CalendarEvent> {
     try {
-      if (this.dataSource === "real") {
-        const authState = await realGoogleCalendar.getAuthState()
-        if (!authState.isAuthenticated) {
-          throw new Error("Not authenticated with Google Calendar")
-        }
-        return await realGoogleCalendar.updateEvent(eventId, eventData)
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, CALENDAR_CONFIG.mockDelay))
-        return await googleCalendar.updateEvent(eventId, eventData)
+      const authState = await realGoogleCalendar.getAuthState()
+      if (!authState.isAuthenticated) {
+        throw new Error("Not authenticated with Google Calendar")
       }
+      return await realGoogleCalendar.updateEvent(eventId, eventData)
     } catch (error) {
       console.error("Error updating calendar event:", error)
-      if (this.dataSource === "real") {
-        console.warn("Falling back to mock data due to API error")
-        return await googleCalendar.updateEvent(eventId, eventData)
-      }
       throw error
     }
   }
 
   async deleteEvent(eventId: string): Promise<boolean> {
     try {
-      if (this.dataSource === "real") {
-        const authState = await realGoogleCalendar.getAuthState()
-        if (!authState.isAuthenticated) {
-          throw new Error("Not authenticated with Google Calendar")
-        }
-        return await realGoogleCalendar.deleteEvent(eventId)
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, CALENDAR_CONFIG.mockDelay))
-        return await googleCalendar.deleteEvent(eventId)
+      const authState = await realGoogleCalendar.getAuthState()
+      if (!authState.isAuthenticated) {
+        throw new Error("Not authenticated with Google Calendar")
       }
+      return await realGoogleCalendar.deleteEvent(eventId)
     } catch (error) {
       console.error("Error deleting calendar event:", error)
-      if (this.dataSource === "real") {
-        console.warn("Falling back to mock data due to API error")
-        return await googleCalendar.deleteEvent(eventId)
-      }
       throw error
     }
   }

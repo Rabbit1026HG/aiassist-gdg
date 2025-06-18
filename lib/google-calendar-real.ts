@@ -30,7 +30,6 @@ export interface CreateEventData {
   attendees?: string[]
   timeZone?: string
 }
-
 export interface AuthState {
   isAuthenticated: boolean
   accessToken: string | null
