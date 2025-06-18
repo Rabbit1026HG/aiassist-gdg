@@ -16,8 +16,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar, Clock, MapPin, Users, Sparkles } from "lucide-react"
-import { googleCalendar, type CreateEventData } from "@/lib/google-calendar"
 import { calendarService } from "@/lib/calendar-service"
+import { CreateEventData } from "@/lib/google-calendar-real"
 
 interface EventModalProps {
   isOpen: boolean

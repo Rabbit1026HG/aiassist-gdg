@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { googleCalendar } from "@/lib/google-calendar"
+import { serverGoogleCalendar } from "@/lib/google-calendar-server"
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const eventData = await request.json()
-    const updatedEvent = await googleCalendar.updateEvent(params.id, eventData)
+    const updatedEvent = await serverGoogleCalendar.updateEvent(params.id, eventData)
 
     return NextResponse.json({ event: updatedEvent })
   } catch (error) {
@@ -15,7 +15,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await googleCalendar.deleteEvent(params.id)
+    await serverGoogleCalendar.deleteEvent(params.id)
 
     return NextResponse.json({ success: true })
   } catch (error) {

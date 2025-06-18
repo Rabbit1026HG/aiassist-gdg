@@ -50,11 +50,6 @@ export function GoogleCalendarAuthPanel({ onAuthChange }: AuthPanelProps) {
     setError(null)
   }
 
-  // Only show for real data source
-  if (calendarService.getDataSource() !== "real") {
-    return null
-  }
-
   return (
     <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
       <CardHeader className="pb-3">

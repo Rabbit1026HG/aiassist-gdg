@@ -7,11 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, Plus, CalendarIcon, Clock, MapPin, Users, Loader2 } from "lucide-react"
 import { EventModal } from "@/components/calendar/event-modal"
-import type { CalendarEvent } from "@/lib/google-calendar"
 import { cn } from "@/lib/utils"
 import { calendarService } from "@/lib/calendar-service"
-import { CalendarDebugPanel } from "@/components/calendar/debug-panel"
 import { GoogleCalendarAuthPanel } from "@/components/calendar/auth-panel"
+import { CalendarEvent } from "@/lib/google-calendar-real"
 
 export function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -24,7 +23,7 @@ export function CalendarView() {
 
   useEffect(() => {
     loadEventsForCurrentMonth()
-  }, [currentDate, view]) // Add 'view' dependency to reload when view changes
+  }, [currentDate, view])
 
   // Handle OAuth callback
   useEffect(() => {
@@ -51,14 +50,12 @@ export function CalendarView() {
     setIsLoading(true)
     try {
       // Check authentication for real data source
-      if (calendarService.getDataSource() === "real") {
-        const authState = await calendarService.getAuthState()
-        if (!authState?.isAuthenticated) {
-          console.log("Not authenticated, skipping API call")
-          setEvents([])
-          setIsLoading(false)
-          return
-        }
+      const authState = await calendarService.getAuthState()
+      if (!authState?.isAuthenticated) {
+        console.log("Not authenticated, skipping API call")
+        setEvents([])
+        setIsLoading(false)
+        return
       }
 
       // Calculate time range based on current view and date
@@ -450,13 +447,8 @@ export function CalendarView() {
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <div
-            className={cn(
-              "w-2 h-2 rounded-full",
-              calendarService.getDataSource() === "real" ? "bg-emerald-500" : "bg-amber-500",
-            )}
-          />
-          {calendarService.getDataSource() === "real" ? "Live Data" : "Test Data"}
+          <div className="w-2 h-2 rounded-full bg-emerald-500" />
+          Google Calendar
         </div>
         <Button
           onClick={() => setIsModalOpen(true)}
@@ -466,9 +458,7 @@ export function CalendarView() {
         </Button>
       </div>
 
-      {process.env.NODE_ENV === "development" && <CalendarDebugPanel onDataSourceChange={loadEventsForCurrentMonth} />}
-
-      {calendarService.getDataSource() === "real" && <GoogleCalendarAuthPanel onAuthChange={setIsAuthenticated} />}
+      <GoogleCalendarAuthPanel onAuthChange={setIsAuthenticated} />
 
       <Card className="modern-card">
         <CardContent className="p-4 md:p-6">

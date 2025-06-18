@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { calendarService } from "@/lib/calendar-service"
 import { serverGoogleCalendar } from "@/lib/google-calendar-server"
 
 export async function GET(request: NextRequest) {
@@ -10,18 +9,12 @@ export async function GET(request: NextRequest) {
 
     console.log("API: Fetching events with params:", { timeMin, timeMax })
 
-    let events
-    if (calendarService.getDataSource() === "real") {
-      // Use server-side service for real data
-      events = await serverGoogleCalendar.getEvents(timeMin || undefined, timeMax || undefined)
-    } else {
-      // Use mock service for test data
-      events = await calendarService.getEvents(timeMin || undefined, timeMax || undefined)
-    }
+    // Always use server-side service for real data
+    const events = await serverGoogleCalendar.getEvents(timeMin || undefined, timeMax || undefined)
 
     return NextResponse.json({
       events,
-      dataSource: calendarService.getDataSource(),
+      dataSource: "real",
       timestamp: new Date().toISOString(),
     })
   } catch (error) {
@@ -29,7 +22,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to fetch calendar events",
-        dataSource: calendarService.getDataSource(),
+        dataSource: "real",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )
@@ -41,19 +35,13 @@ export async function POST(request: NextRequest) {
     const eventData = await request.json()
     console.log("API: Creating event:", eventData)
 
-    let newEvent
-    if (calendarService.getDataSource() === "real") {
-      // Use server-side service for real data
-      newEvent = await serverGoogleCalendar.createEvent(eventData)
-    } else {
-      // Use mock service for test data
-      newEvent = await calendarService.createEvent(eventData)
-    }
+    // Always use server-side service for real data
+    const newEvent = await serverGoogleCalendar.createEvent(eventData)
 
     return NextResponse.json(
       {
         event: newEvent,
-        dataSource: calendarService.getDataSource(),
+        dataSource: "real",
       },
       { status: 201 },
     )
@@ -62,7 +50,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Failed to create calendar event",
-        dataSource: calendarService.getDataSource(),
+        dataSource: "real",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )

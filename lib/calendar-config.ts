@@ -1,16 +1,13 @@
 // Configuration for calendar data source
 export const CALENDAR_CONFIG = {
-  // Set to 'mock' for development/testing, 'real' for production
-  dataSource: process.env.NODE_ENV === "production" ? "real" : "mock",
+  // Always use real data in both development and production
+  dataSource: "real" as const,
 
   // API endpoints
   endpoints: {
     events: "/api/calendar/events",
     auth: "/api/auth/google",
   },
-
-  // Mock data settings
-  mockDelay: 1000, // Simulate API delay in milliseconds
 }
 
-export type CalendarDataSource = "mock" | "real"
+export type CalendarDataSource = "real"
