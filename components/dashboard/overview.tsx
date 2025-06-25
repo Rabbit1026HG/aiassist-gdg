@@ -4,12 +4,67 @@ import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, CheckCircle2, Clock, Mic, Plus, Send, Sparkles, TrendingUp, Zap } from "lucide-react"
-import { useState } from "react"
+import { Calendar, CheckCircle2, Clock, Mic, Plus, Send, Sparkles, TrendingUp, Zap, RefreshCw } from "lucide-react"
+import { useState, useEffect } from "react"
+// import { generateSuggestions } from "@/lib/ai-service"
 
 export function DashboardOverview() {
   const [inputValue, setInputValue] = useState("")
   const [isRecording, setIsRecording] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+
+  // Mock data for demonstration
+  const mockTasks = [
+    "Prepare presentation for client meeting",
+    "Review quarterly report draft",
+    "Submit expense reports",
+  ]
+
+  const mockEvents = [
+    { title: "Design Team Meeting", date: new Date(2025, 5, 12, 10, 0) },
+    { title: "Client Presentation", date: new Date(2025, 5, 12, 14, 0) },
+    { title: "Weekly Team Sync", date: new Date(2025, 5, 13, 9, 0) },
+  ]
+
+  const mockPreferences = {
+    workingHours: "9-17",
+    timezone: "America/New_York",
+    meetingBuffer: 15,
+  }
+
+  useEffect(() => {
+    loadAISuggestions()
+  }, [])
+
+  const loadAISuggestions = async () => {
+    setIsLoadingSuggestions(true)
+    try {
+      const res = await fetch("/api/assistant/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tasks: mockTasks,
+          events: mockEvents,
+          preferences: mockPreferences,
+        }),
+      })
+
+      if (!res.ok) throw new Error(await res.text())
+
+      const data = await res.json()
+      setAiSuggestions(data.suggestions)
+    } catch (error) {
+      console.error("Error loading AI suggestions:", error)
+      setAiSuggestions([
+        "Prepare for your upcoming design meeting by reviewing project materials",
+        "Consider scheduling buffer time between your back-to-back meetings",
+        "Set up automated reminders for your expense report deadline",
+      ])
+    } finally {
+      setIsLoadingSuggestions(false)
+    }
+  }
 
   const handleVoiceInput = () => {
     setIsRecording(!isRecording)
@@ -85,8 +140,8 @@ export function DashboardOverview() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">4</div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Based on your schedule</p>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{aiSuggestions.length}</div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Powered by OpenAI</p>
           </CardContent>
         </Card>
       </div>
@@ -109,7 +164,7 @@ export function DashboardOverview() {
             value="suggestions"
             className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm"
           >
-            Suggestions
+            AI Suggestions
           </TabsTrigger>
         </TabsList>
 
@@ -202,62 +257,56 @@ export function DashboardOverview() {
 
         <TabsContent value="suggestions">
           <Card className="modern-card">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {[
-                  {
-                    title: "Prepare for Design Meeting",
-                    description:
-                      "You have a design team meeting tomorrow. Would you like me to gather the latest design files and prepare an agenda?",
-                    color: "violet",
-                  },
-                  {
-                    title: "Schedule Break Time",
-                    description:
-                      "You have back-to-back meetings today. Would you like me to schedule a 15-minute break between them?",
-                    color: "emerald",
-                  },
-                  {
-                    title: "Quarterly Report Reminder",
-                    description:
-                      "The quarterly report is due in 2 days. Would you like me to send a reminder to the team?",
-                    color: "amber",
-                  },
-                ].map((suggestion, index) => (
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-violet-600" />
+                AI-Powered Suggestions
+              </CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={loadAISuggestions}
+                disabled={isLoadingSuggestions}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={cn("h-4 w-4", isLoadingSuggestions && "animate-spin")} />
+                Refresh
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isLoadingSuggestions ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-6 w-6 animate-spin text-violet-600 mr-2" />
+                  <span className="text-slate-600 dark:text-slate-300">Generating AI suggestions...</span>
+                </div>
+              ) : (
+                aiSuggestions.map((suggestion, index) => (
                   <div
                     key={index}
                     className="rounded-xl bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-800 p-4 border border-slate-200 dark:border-slate-700"
                   >
                     <div className="flex items-start gap-3">
-                      <div
-                        className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-1",
-                          suggestion.color === "violet" && "bg-gradient-to-r from-violet-500 to-purple-500",
-                          suggestion.color === "emerald" && "bg-gradient-to-r from-emerald-500 to-teal-500",
-                          suggestion.color === "amber" && "bg-gradient-to-r from-amber-500 to-orange-500",
-                        )}
-                      >
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-violet-500 to-emerald-500 flex items-center justify-center flex-shrink-0 mt-1">
                         <Sparkles className="h-4 w-4 text-white" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">{suggestion.title}</h3>
-                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">{suggestion.description}</p>
+                        <p className="text-slate-700 dark:text-slate-300 mb-3">{suggestion}</p>
                         <div className="flex gap-2">
                           <Button
                             size="sm"
                             className="bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white"
                           >
-                            Yes, please
+                            Apply
                           </Button>
                           <Button size="sm" variant="outline" className="border-slate-300 dark:border-slate-600">
-                            No, thanks
+                            Dismiss
                           </Button>
                         </div>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </TabsContent>

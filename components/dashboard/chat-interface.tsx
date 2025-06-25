@@ -1,101 +1,34 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
+import { useChat } from "ai/react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Mic, Send, StopCircle, Copy, Check, Bot, User, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type Message = {
-  id: string
-  content: string
-  role: "user" | "assistant"
-  timestamp: Date
-}
-
 export function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      content:
-        "Hello! I'm your AI assistant. How can I help you today? I can help you manage tasks, schedule meetings, set reminders, and much more.",
-      role: "assistant",
-      timestamp: new Date(),
-    },
-  ])
-  const [input, setInput] = useState("")
   const [isRecording, setIsRecording] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+    api: "/api/chat",
+    initialMessages: [
+      {
+        id: "welcome",
+        role: "assistant",
+        content:
+          "Hello! I'm your AI assistant. How can I help you today? I can help you manage tasks, schedule meetings, set reminders, and much more.",
+      },
+    ],
+  })
 
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
-
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    e?.preventDefault()
-
-    if (!input.trim()) return
-
-    // Add user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: input.trim(),
-      role: "user",
-      timestamp: new Date(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInput("")
-
-    // Reset textarea height
-    const textarea = document.querySelector("textarea") as HTMLTextAreaElement
-    if (textarea) {
-      textarea.style.height = "auto"
-      textarea.style.height = "2.5rem"
-    }
-
-    setIsProcessing(true)
-
-    // Simulate AI response
-    setTimeout(() => {
-      let response = ""
-
-      if (input.toLowerCase().includes("meeting") || input.toLowerCase().includes("schedule")) {
-        response =
-          "I'll help you schedule that meeting. Let me check your calendar for available time slots. Would you like me to send calendar invites to the participants and set up a meeting room?"
-      } else if (input.toLowerCase().includes("reminder")) {
-        response =
-          "I've set a reminder for you. I'll notify you at the specified time with a notification. You can also view all your reminders in the dashboard."
-      } else if (input.toLowerCase().includes("task") || input.toLowerCase().includes("todo")) {
-        response =
-          "I've added that task to your to-do list. Would you like me to set a deadline, assign a priority level, or break it down into smaller subtasks?"
-      } else if (input.toLowerCase().includes("email")) {
-        response =
-          "I can help you with email management. Would you like me to draft an email, check your inbox for important messages, or set up email filters?"
-      } else if (input.toLowerCase().includes("calendar")) {
-        response =
-          "Let me access your calendar. I can show you upcoming events, find free time slots, or help you reschedule conflicting appointments. What would you like to do?"
-      } else {
-        response =
-          "I understand what you're asking. Let me help you with that. Is there anything specific you'd like me to focus on or any particular way you'd like me to approach this task?"
-      }
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response,
-        role: "assistant",
-        timestamp: new Date(),
-      }
-
-      setMessages((prev) => [...prev, assistantMessage])
-      setIsProcessing(false)
-    }, 1500)
-  }
 
   const handleVoiceInput = () => {
     setIsRecording(!isRecording)
@@ -103,7 +36,9 @@ export function ChatInterface() {
     if (!isRecording) {
       // Simulate voice recording
       setTimeout(() => {
-        setInput("Schedule a meeting with the design team tomorrow at 10 AM")
+        // This would be replaced with actual speech-to-text functionality
+        const voiceInput = "Schedule a meeting with the design team tomorrow at 10 AM"
+        handleInputChange({ target: { value: voiceInput } } as React.ChangeEvent<HTMLTextAreaElement>)
         setIsRecording(false)
       }, 2000)
     } else {
@@ -129,6 +64,20 @@ export function ChatInterface() {
     })
   }
 
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!input.trim()) return
+
+    // Reset textarea height
+    const textarea = document.querySelector("textarea") as HTMLTextAreaElement
+    if (textarea) {
+      textarea.style.height = "auto"
+      textarea.style.height = "2.5rem"
+    }
+
+    handleSubmit(e)
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <div className="flex items-center justify-between mb-6">
@@ -141,7 +90,7 @@ export function ChatInterface() {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm">
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-            Online
+            {error ? "Error" : "Online"}
           </div>
         </div>
       </div>
@@ -221,14 +170,14 @@ export function ChatInterface() {
                     message.role === "user" ? "text-right" : "text-left",
                   )}
                 >
-                  {formatTime(message.timestamp)}
+                  {formatTime(new Date(message.createdAt || Date.now()))}
                 </div>
               </div>
             </div>
           ))}
 
           {/* Typing Indicator */}
-          {isProcessing && (
+          {isLoading && (
             <div className="flex gap-3 md:gap-4 animate-fade-in">
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0">
                 <Bot className="h-4 w-4 md:h-5 md:w-5 text-white" />
@@ -249,26 +198,42 @@ export function ChatInterface() {
             </div>
           )}
 
+          {/* Error Message */}
+          {error && (
+            <div className="flex gap-3 md:gap-4 animate-fade-in">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-red-500 flex items-center justify-center flex-shrink-0">
+                <Bot className="h-4 w-4 md:h-5 md:w-5 text-white" />
+              </div>
+              <div className="flex-1 max-w-[75%]">
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl px-5 py-4 shadow-sm">
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    Sorry, I encountered an error. Please try again or check your connection.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
         <div className="border-t border-slate-200 dark:border-slate-700 p-4 md:p-6 bg-slate-50/50 dark:bg-slate-800/50">
-          <form onSubmit={handleSendMessage}>
+          <form onSubmit={onSubmit}>
             {/* Input Field with embedded icons */}
             <div className="relative">
               <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
-                    handleSendMessage()
+                    onSubmit(e as any)
                   }
                 }}
-                placeholder={isRecording ?"" : "Type your message..."}
+                placeholder={isRecording ? "" : "Type your message..."}
                 className="w-full min-h-[3rem] md:min-h-[3.5rem] max-h-[6rem] md:max-h-[8rem] rounded-xl border-2 border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm pl-4 md:pl-5 pr-20 md:pr-24 py-2.5 md:py-3 text-sm md:text-base focus:border-violet-500/70 dark:focus:border-violet-400/70 focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-violet-400/20 focus:outline-none transition-all duration-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none overflow-y-hidden"
-                disabled={isRecording || isProcessing}
+                disabled={isRecording || isLoading}
                 rows={1}
                 style={{
                   height: "auto",
@@ -327,7 +292,7 @@ export function ChatInterface() {
                 <Button
                   type="submit"
                   size="icon"
-                  disabled={!input.trim() || isProcessing}
+                  disabled={!input.trim() || isLoading}
                   className="w-8 h-8 md:w-9 md:h-9 rounded-lg bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100"
                 >
                   <Send className="h-4 w-4 md:h-5 md:w-5" />
