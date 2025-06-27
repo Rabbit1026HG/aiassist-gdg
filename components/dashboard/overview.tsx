@@ -14,23 +14,29 @@ export function DashboardOverview() {
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
 
-  // Mock data for demonstration
+  // George's actual activities and schedule
   const mockTasks = [
-    "Prepare presentation for client meeting",
-    "Review quarterly report draft",
-    "Submit expense reports",
+    "Prepare will documents for morning client signing",
+    "Review trust amendments for Henderson client",
+    "Practice Serrada Escrima forms - evening session",
+    "Research Nevada probate law updates",
+    "Prepare theatre acting lesson plans",
   ]
 
   const mockEvents = [
-    { title: "Design Team Meeting", date: new Date(2025, 5, 12, 10, 0) },
-    { title: "Client Presentation", date: new Date(2025, 5, 12, 14, 0) },
-    { title: "Weekly Team Sync", date: new Date(2025, 5, 13, 9, 0) },
+    { title: "Client Signing - Estate Planning", date: new Date(2025, 5, 12, 9, 0) },
+    { title: "Theatre Acting Class", date: new Date(2025, 5, 12, 14, 0) },
+    { title: "Jazz Piano Practice", date: new Date(2025, 5, 12, 16, 0) },
+    { title: "Martial Arts Training", date: new Date(2025, 5, 13, 17, 0) },
   ]
 
   const mockPreferences = {
-    workingHours: "9-17",
-    timezone: "America/New_York",
-    meetingBuffer: 15,
+    workingHours: "5-21", // 5 AM to 9 PM schedule
+    timezone: "America/Los_Angeles", // Las Vegas timezone
+    clientSignings: "morning-only",
+    sleepSchedule: "21:00-05:00",
+    homeOffice: true,
+    disciplines: ["law", "theatre", "martial-arts", "music", "research"],
   }
 
   useEffect(() => {
@@ -267,7 +273,7 @@ export function DashboardOverview() {
                 variant="outline"
                 onClick={loadAISuggestions}
                 disabled={isLoadingSuggestions}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 bg-transparent"
               >
                 <RefreshCw className={cn("h-4 w-4", isLoadingSuggestions && "animate-spin")} />
                 Refresh
@@ -298,7 +304,11 @@ export function DashboardOverview() {
                           >
                             Apply
                           </Button>
-                          <Button size="sm" variant="outline" className="border-slate-300 dark:border-slate-600">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-slate-300 dark:border-slate-600 bg-transparent"
+                          >
                             Dismiss
                           </Button>
                         </div>
@@ -325,8 +335,9 @@ export function DashboardOverview() {
           <div className="space-y-4">
             <div className="rounded-xl bg-gradient-to-r from-violet-50 to-emerald-50 dark:from-violet-900/20 dark:to-emerald-900/20 p-4 border border-violet-200 dark:border-violet-700">
               <p className="text-slate-700 dark:text-slate-300">
-                Good morning! I see you have a design team meeting scheduled for tomorrow at 10:00 AM. Would you like me
-                to prepare an agenda or gather any materials for this meeting?
+                Good morning, George! I see you have client signings scheduled for this morning - perfect timing for
+                your peak energy hours. Would you like me to help prepare your legal documents or suggest an optimal
+                schedule for balancing your law practice, theatre work, and martial arts training today?
               </p>
             </div>
             <div className="flex items-center gap-2">
