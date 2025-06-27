@@ -20,7 +20,7 @@ export function ChatInterface() {
         id: "welcome",
         role: "assistant",
         content:
-          "Hello! I'm your AI assistant. How can I help you today? I can help you manage tasks, schedule meetings, set reminders, and much more.",
+          "Hi, George! I'm your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
       },
     ],
   })

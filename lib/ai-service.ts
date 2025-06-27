@@ -7,31 +7,43 @@ export async function generateSuggestions(context: {
   events: { title: string; date: Date }[]
   preferences: Record<string, any>
 }) {
-  const prompt = `Based on the following user context, generate 3 helpful and actionable productivity suggestions:
-    
-    Current Tasks: ${context.tasks.length > 0 ? context.tasks.join(", ") : "No current tasks"}
-    
-    Upcoming Events: ${
-      context.events.length
-        ? context.events
-            .map((e) => {
-              const d = e.date instanceof Date ? e.date : new Date(e.date as unknown as string)
-              return `${e.title} on ${d.toLocaleDateString()}`
-            })
-            .join(", ")
-        : "No upcoming events"
-    }
-    
-    User Preferences: ${
-      Object.keys(context.preferences).length > 0 ? JSON.stringify(context.preferences) : "No specific preferences set"
-    }
-    
-    Please provide 3 specific, actionable suggestions that would help improve productivity, prepare for upcoming events, or optimize their workflow. Each suggestion should be:
-    - Specific and actionable
-    - Relevant to their current situation
-    - Focused on productivity improvement
-    
-    Format each suggestion as a brief, clear statement (1-2 sentences max).`
+  const prompt = `You are George's personal AI assistant. Generate 3 helpful and actionable productivity suggestions based on his profile and current context:
+
+GEORGE'S PROFILE:
+- Solo legal practitioner (Wills & Trusts specialist)
+- Theatre/Acting teacher and practitioner  
+- Martial Arts: Serrada Escrima Cabales Style
+- Jazz Piano player
+- Researcher: Legal matters, Quantum Mechanics, Las Vegas housing market
+- Schedule: Sleep 9 PM, Wake 5 AM, Morning client signings
+- Works mostly from home
+
+CURRENT CONTEXT:
+Current Tasks: ${context.tasks.length > 0 ? context.tasks.join(", ") : "No current tasks"}
+
+Upcoming Events: ${
+    context.events.length
+      ? context.events
+          .map((e) => {
+            const d = e.date instanceof Date ? e.date : new Date(e.date as unknown as string)
+            return `${e.title} on ${d.toLocaleDateString()}`
+          })
+          .join(", ")
+      : "No upcoming events"
+  }
+
+User Preferences: ${
+    Object.keys(context.preferences).length > 0 ? JSON.stringify(context.preferences) : "Standard preferences"
+  }
+
+Generate 3 specific suggestions that:
+- Respect his 9 PM bedtime and 5 AM wake schedule
+- Optimize his morning energy for legal work/client signings
+- Balance his multiple disciplines (law, theatre, martial arts, music, research)
+- Support his solo practice efficiency
+- Consider his home-based work environment
+
+Each suggestion should be specific, actionable, and tailored to George's unique lifestyle and professional needs.`
 
   try {
     const { text } = await generateText({
