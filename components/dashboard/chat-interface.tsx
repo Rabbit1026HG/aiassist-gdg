@@ -17,6 +17,7 @@ export function ChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [hasUserMessages, setHasUserMessages] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
@@ -25,8 +26,10 @@ export function ChatInterface() {
     api: "/api/chat",
     initialMessages: [],
     onFinish: async (message) => {
-      if (currentConversation) {
+      if (currentConversation && hasUserMessages) {
         await chatStorage.addMessage(currentConversation.id, "assistant", message.content)
+        // Refresh conversations list to show updated message count
+        loadConversations()
       }
     },
     onError: (error) => {
@@ -59,33 +62,65 @@ export function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Initialize with a new conversation on mount
+  // Initialize with existing conversations or create temporary state
   useEffect(() => {
-    handleNewConversation()
+    initializeChat()
   }, [])
 
-  const handleNewConversation = async () => {
+  // Check if there are user messages (excluding welcome message)
+  useEffect(() => {
+    const userMessages = messages.filter((msg) => msg.role === "user")
+    setHasUserMessages(userMessages.length > 0)
+  }, [messages])
+
+  const initializeChat = async () => {
     try {
-      const conversation = await chatStorage.createConversation({
-        title: "New Conversation",
-      })
-      setCurrentConversation(conversation)
-      setMessages([
-        {
-          id: "welcome",
-          role: "assistant",
-          content:
-            "Hi, George! I'm your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
-        },
-      ])
+      // Try to load existing conversations first
+      const conversations = await chatStorage.getConversations()
+
+      if (conversations.length > 0) {
+        // Load the most recent conversation
+        const latestConversation = conversations[0]
+        await handleConversationSelect(latestConversation.id)
+      } else {
+        // Start with a temporary conversation (not saved until user sends a message)
+        startTemporaryConversation()
+      }
     } catch (error) {
-      console.error("Error creating new conversation:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create new conversation.",
-        variant: "destructive",
-      })
+      console.error("Error initializing chat:", error)
+      startTemporaryConversation()
     }
+  }
+
+  const startTemporaryConversation = () => {
+    // Create a temporary conversation state without saving to storage
+    setCurrentConversation({
+      id: "temp-" + Date.now(),
+      title: "New Conversation",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      messageCount: 0,
+    })
+
+    setMessages([
+      {
+        id: "welcome",
+        role: "assistant",
+        content:
+          "Hi, George! I'm your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
+      },
+    ])
+  }
+
+  const loadConversations = async () => {
+    // This will trigger a re-render of the sidebar with updated conversations
+    // The sidebar component handles its own loading
+  }
+
+  const handleNewConversation = async () => {
+    // Start with a temporary conversation
+    startTemporaryConversation()
+    setHasUserMessages(false)
   }
 
   const handleConversationSelect = async (conversationId: string) => {
@@ -116,6 +151,10 @@ export function ChatInterface() {
         }
 
         setMessages(formattedMessages)
+
+        // Check if this conversation has user messages
+        const userMessages = formattedMessages.filter((msg) => msg.role === "user")
+        setHasUserMessages(userMessages.length > 0)
       }
     } catch (error) {
       console.error("Error loading conversation:", error)
@@ -172,13 +211,36 @@ export function ChatInterface() {
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!input.trim() || !currentConversation) return
+    if (!input.trim()) return
 
-    // Store user message
-    await chatStorage.addMessage(currentConversation.id, "user", input.trim())
+    // If this is a temporary conversation, save it now
+    if (currentConversation && currentConversation.id.startsWith("temp-")) {
+      try {
+        const newConversation = await chatStorage.createConversation({
+          title: "New Conversation",
+          firstMessage: input.trim(),
+        })
+        setCurrentConversation(newConversation)
+        setHasUserMessages(true)
+
+        // Store the user message
+        await chatStorage.addMessage(newConversation.id, "user", input.trim())
+      } catch (error) {
+        console.error("Error creating conversation:", error)
+        toast({
+          title: "Error",
+          description: "Failed to create conversation.",
+          variant: "destructive",
+        })
+        return
+      }
+    } else if (currentConversation && hasUserMessages) {
+      // Store user message for existing conversation
+      await chatStorage.addMessage(currentConversation.id, "user", input.trim())
+    }
 
     // Update conversation title if it's the first user message
-    if (messages.length <= 1) {
+    if (currentConversation && !hasUserMessages) {
       const title = await chatStorage.generateConversationTitle(input.trim())
       await chatStorage.updateConversation(currentConversation.id, { title })
       setCurrentConversation((prev) => (prev ? { ...prev, title } : null))
@@ -216,7 +278,7 @@ export function ChatInterface() {
         isMobile={isMobile}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        className={cn("transition-all duration-300 ease-in-out", !isMobile && (sidebarOpen ? "w-80" : "w-0"))}
+        className={cn("transition-all duration-300 ease-in-out", !isMobile && (sidebarOpen ? "w-72 lg:w-80" : "w-0"))}
       />
 
       {/* Main Chat Area */}
