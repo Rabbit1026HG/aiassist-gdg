@@ -319,7 +319,7 @@ export function ChatInterface() {
         {/* Messages Area */}
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
-            {messages.map((message) => (
+            {messages.map((message, index) => (
               <div
                 key={message.id}
                 className={cn(
@@ -367,9 +367,22 @@ export function ChatInterface() {
                       </div>
                     )}
 
-                    <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words">
+                    <div className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words">
                       {message.content}
-                    </p>
+                      {/* Show typing indicator for the last assistant message if it's streaming */}
+                      {message.role === "assistant" &&
+                        index === messages.length - 1 &&
+                        isLoading &&
+                        message.content && (
+                          <span className="inline-flex ml-1">
+                            <div className="flex space-x-1 items-center">
+                              <div className="w-1 h-1 rounded-full bg-slate-400 animate-bounce" />
+                              <div className="w-1 h-1 rounded-full bg-slate-400 animate-bounce [animation-delay:0.2s]" />
+                              <div className="w-1 h-1 rounded-full bg-slate-400 animate-bounce [animation-delay:0.4s]" />
+                            </div>
+                          </span>
+                        )}
+                    </div>
 
                     {/* Copy Button */}
                     <Button
@@ -400,8 +413,8 @@ export function ChatInterface() {
               </div>
             ))}
 
-            {/* Typing Indicator */}
-            {isLoading && (
+            {/* Initial Loading State - Only show when no messages are streaming */}
+            {isLoading && messages.length > 0 && messages[messages.length - 1]?.role === "user" && (
               <div className="flex gap-2 sm:gap-3 lg:gap-4 animate-fade-in">
                 <div className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center flex-shrink-0">
                   <Bot className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-white" />
