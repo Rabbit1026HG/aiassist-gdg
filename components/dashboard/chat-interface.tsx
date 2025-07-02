@@ -10,8 +10,7 @@ import { ConversationSidebar } from "@/components/chat/conversation-sidebar"
 import { chatStorage } from "@/lib/chat-storage"
 import { useToast } from "@/hooks/use-toast"
 import type { Conversation } from "@/lib/types/chat"
-import { MarkdownRenderer } from "../ui/markdown"
-// import { MarkdownRenderer } from "@/components/ui/markdown"
+import { MarkdownRenderer } from "@/components/ui/markdown"
 
 export function ChatInterface() {
   const [isRecording, setIsRecording] = useState(false)
@@ -43,6 +42,19 @@ export function ChatInterface() {
       })
     },
   })
+
+  // Get time-appropriate greeting
+  const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours()
+
+    if (hour >= 5 && hour < 12) {
+      return "Good morning"
+    } else if (hour >= 12 && hour < 17) {
+      return "Good afternoon"
+    } else {
+      return "Good evening"
+    }
+  }
 
   // Check if mobile on mount and resize
   useEffect(() => {
@@ -96,6 +108,8 @@ export function ChatInterface() {
   }
 
   const startTemporaryConversation = () => {
+    const greeting = getTimeBasedGreeting()
+
     // Create a temporary conversation state without saving to storage
     setCurrentConversation({
       id: "temp-" + Date.now(),
@@ -109,8 +123,7 @@ export function ChatInterface() {
       {
         id: "welcome",
         role: "assistant",
-        content:
-          "Hi, George! I'm **Thea**, your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
+        content: `${greeting}, George!`,
       },
     ])
   }
@@ -144,11 +157,11 @@ export function ChatInterface() {
 
         // Add welcome message if no messages exist
         if (formattedMessages.length === 0) {
+          const greeting = getTimeBasedGreeting()
           formattedMessages.unshift({
             id: "welcome",
             role: "assistant",
-            content:
-              "Hi, George! I'm **Thea**, your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
+            content: `${greeting}, George! I'm **Thea**, your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?`,
             createdAt: new Date(),
           })
         }
