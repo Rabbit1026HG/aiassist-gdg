@@ -10,6 +10,8 @@ import { ConversationSidebar } from "@/components/chat/conversation-sidebar"
 import { chatStorage } from "@/lib/chat-storage"
 import { useToast } from "@/hooks/use-toast"
 import type { Conversation } from "@/lib/types/chat"
+import { MarkdownRenderer } from "../ui/markdown"
+// import { MarkdownRenderer } from "@/components/ui/markdown"
 
 export function ChatInterface() {
   const [isRecording, setIsRecording] = useState(false)
@@ -33,6 +35,7 @@ export function ChatInterface() {
       }
     },
     onError: (error) => {
+      console.error("Chat error:", error)
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",
@@ -107,7 +110,7 @@ export function ChatInterface() {
         id: "welcome",
         role: "assistant",
         content:
-          "Hi, George! I'm your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
+          "Hi, George! I'm **Thea**, your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
       },
     ])
   }
@@ -145,7 +148,7 @@ export function ChatInterface() {
             id: "welcome",
             role: "assistant",
             content:
-              "Hi, George! I'm your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
+              "Hi, George! I'm **Thea**, your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
             createdAt: new Date(),
           })
         }
@@ -300,7 +303,7 @@ export function ChatInterface() {
             </Button>
             <div className="min-w-0 flex-1">
               <h1 className="text-base sm:text-xl font-bold bg-gradient-to-r from-violet-600 to-emerald-600 bg-clip-text text-transparent truncate">
-                {currentConversation?.title || "AI Assistant"}
+                {currentConversation?.title || "Thea"}
               </h1>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 hidden sm:block">
                 Your intelligent productivity companion
@@ -363,12 +366,16 @@ export function ChatInterface() {
                     {message.role === "assistant" && (
                       <div className="flex items-center gap-2 mb-2 text-xs text-slate-500 dark:text-slate-400">
                         <Sparkles className="h-3 w-3" />
-                        AI Assistant
+                        Thea
                       </div>
                     )}
 
-                    <div className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words">
-                      {message.content}
+                    <div className="leading-relaxed">
+                      {message.role === "assistant" ? (
+                        <MarkdownRenderer content={message.content} />
+                      ) : (
+                        <div className="text-sm sm:text-base whitespace-pre-wrap break-words">{message.content}</div>
+                      )}
                       {/* Show typing indicator for the last assistant message if it's streaming */}
                       {message.role === "assistant" &&
                         index === messages.length - 1 &&
@@ -423,7 +430,7 @@ export function ChatInterface() {
                   <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-3 py-2 sm:px-4 sm:py-3 lg:px-5 lg:py-4 shadow-sm">
                     <div className="flex items-center gap-2 mb-2 text-xs text-slate-500 dark:text-slate-400">
                       <Sparkles className="h-3 w-3 animate-pulse" />
-                      AI Assistant is thinking...
+                      Thea is thinking...
                     </div>
                     <div className="flex space-x-2 items-center">
                       <div className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" />

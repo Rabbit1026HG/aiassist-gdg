@@ -82,6 +82,41 @@ export function DashboardOverview() {
     }
   }
 
+  // Mock functions to simulate conversation handling
+  const setMessages = (messages: any) => {
+    console.log("Setting messages:", messages)
+  }
+
+  const handleConversationSelect = (conversation: any) => {
+    console.log("Selected conversation:", conversation)
+    const formattedMessages = conversation.messages.map((message: any) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      createdAt: new Date(message.createdAt),
+    }))
+
+    formattedMessages.unshift({
+      id: "welcome",
+      role: "assistant",
+      content:
+        "Hi, George! I'm Thea, your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
+      createdAt: new Date(),
+    })
+    setMessages(formattedMessages)
+  }
+
+  const startTemporaryConversation = () => {
+    setMessages([
+      {
+        id: "welcome",
+        role: "assistant",
+        content:
+          "Hi, George! I'm Thea, your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
+      },
+    ])
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
