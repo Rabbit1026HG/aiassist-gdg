@@ -4,13 +4,15 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { useChat } from "ai/react"
 import { Button } from "@/components/ui/button"
-import { Mic, Send, StopCircle, Copy, Check, Bot, User, Sparkles, Menu, X } from "lucide-react"
+import { Mic, Send, StopCircle, Copy, Check, Bot, User, Sparkles, Menu, X, MicOff, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ConversationSidebar } from "@/components/chat/conversation-sidebar"
 import { chatStorage } from "@/lib/chat-storage"
 import { useToast } from "@/hooks/use-toast"
 import type { Conversation } from "@/lib/types/chat"
 import { MarkdownRenderer } from "@/components/ui/markdown"
+import { AudioRecorder } from "@/lib/audio-recorder"
+import { SpeechService } from "@/lib/speech-service"
 
 export function ChatInterface() {
   const [isRecording, setIsRecording] = useState(false)
@@ -19,8 +21,16 @@ export function ChatInterface() {
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [hasUserMessages, setHasUserMessages] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [microphonePermission, setMicrophonePermission] = useState<boolean | null>(null)
+  const [recordingDuration, setRecordingDuration] = useState(0)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const audioRecorderRef = useRef<AudioRecorder | null>(null)
+  const speechServiceRef = useRef<SpeechService | null>(null)
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
+
   const { toast } = useToast()
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, error, setMessages } = useChat({
@@ -42,6 +52,27 @@ export function ChatInterface() {
       })
     },
   })
+
+  // Initialize audio services
+  useEffect(() => {
+    audioRecorderRef.current = new AudioRecorder()
+    speechServiceRef.current = SpeechService.getInstance()
+
+    // Check microphone permission on mount
+    checkMicrophonePermission()
+  }, [])
+
+  const checkMicrophonePermission = async () => {
+    try {
+      if (audioRecorderRef.current) {
+        const hasPermission = await audioRecorderRef.current.checkMicrophonePermission()
+        setMicrophonePermission(hasPermission)
+      }
+    } catch (error) {
+      console.error("Error checking microphone permission:", error)
+      setMicrophonePermission(false)
+    }
+  }
 
   // Get time-appropriate greeting
   const getTimeBasedGreeting = () => {
@@ -88,6 +119,15 @@ export function ChatInterface() {
     setHasUserMessages(userMessages.length > 0)
   }, [messages])
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current)
+      }
+    }
+  }, [])
+
   const initializeChat = async () => {
     try {
       // Try to load existing conversations first
@@ -123,7 +163,7 @@ export function ChatInterface() {
       {
         id: "welcome",
         role: "assistant",
-        content: `${greeting}, George!`,
+        content: `${greeting}, George! How can I assist you today?`,
       },
     ])
   }
@@ -182,20 +222,92 @@ export function ChatInterface() {
     }
   }
 
-  const handleVoiceInput = () => {
-    setIsRecording(!isRecording)
+  const handleVoiceInput = async () => {
+    if (!audioRecorderRef.current || !speechServiceRef.current) {
+      toast({
+        title: "Error",
+        description: "Voice recording not available.",
+        variant: "destructive",
+      })
+      return
+    }
 
-    if (!isRecording) {
-      // Simulate voice recording
-      setTimeout(() => {
-        // This would be replaced with actual speech-to-text functionality
-        const voiceInput = "Schedule a meeting with the design team tomorrow at 10 AM"
-        handleInputChange({ target: { value: voiceInput } } as React.ChangeEvent<HTMLTextAreaElement>)
-        setIsRecording(false)
-      }, 2000)
-    } else {
+    if (isRecording) {
       // Stop recording
-      setIsRecording(false)
+      try {
+        setIsTranscribing(true)
+        const audioBlob = await audioRecorderRef.current.stopRecording()
+
+        // Clear the recording timer
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current)
+          recordingTimerRef.current = null
+        }
+        setRecordingDuration(0)
+
+        // Transcribe the audio
+        const transcription = await speechServiceRef.current.transcribeAudio(audioBlob)
+
+        if (transcription.trim()) {
+          // Set the transcribed text in the input field
+          handleInputChange({
+            target: { value: transcription.trim() },
+          } as React.ChangeEvent<HTMLTextAreaElement>)
+
+          // Focus the textarea
+          if (textareaRef.current) {
+            textareaRef.current.focus()
+          }
+
+          toast({
+            title: "Voice Input Complete",
+            description: "Your speech has been transcribed successfully.",
+          })
+        } else {
+          toast({
+            title: "No Speech Detected",
+            description: "Please try speaking more clearly or check your microphone.",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Voice input error:", error)
+        toast({
+          title: "Voice Input Failed",
+          description: error instanceof Error ? error.message : "Failed to process voice input.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsRecording(false)
+        setIsTranscribing(false)
+      }
+    } else {
+      // Start recording
+      try {
+        await audioRecorderRef.current.startRecording()
+        setIsRecording(true)
+        setRecordingDuration(0)
+
+        // Start the recording timer
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingDuration((prev) => prev + 1)
+        }, 1000)
+
+        toast({
+          title: "Recording Started",
+          description: "Speak now. Tap the microphone again to stop.",
+        })
+      } catch (error) {
+        console.error("Failed to start recording:", error)
+        toast({
+          title: "Recording Failed",
+          description: error instanceof Error ? error.message : "Failed to start voice recording.",
+          variant: "destructive",
+        })
+
+        // Check permission again
+        checkMicrophonePermission()
+      }
     }
   }
 
@@ -223,6 +335,12 @@ export function ChatInterface() {
       hour: "2-digit",
       minute: "2-digit",
     })
+  }
+
+  const formatRecordingDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -282,6 +400,32 @@ export function ChatInterface() {
     } else {
       textarea.style.overflowY = "hidden"
     }
+  }
+
+  const getMicrophoneIcon = () => {
+    if (isTranscribing) {
+      return <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 animate-spin" />
+    }
+    if (isRecording) {
+      return <StopCircle className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 animate-pulse" />
+    }
+    if (microphonePermission === false) {
+      return <MicOff className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
+    }
+    return <Mic className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
+  }
+
+  const getMicrophoneButtonClass = () => {
+    if (isTranscribing) {
+      return "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+    }
+    if (isRecording) {
+      return "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+    }
+    if (microphonePermission === false) {
+      return "text-gray-400 cursor-not-allowed"
+    }
+    return "text-slate-600 dark:text-slate-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-600 dark:hover:text-violet-400"
   }
 
   return (
@@ -476,6 +620,27 @@ export function ChatInterface() {
 
           {/* Input Area */}
           <div className="border-t border-slate-200 dark:border-slate-700 p-3 sm:p-4 lg:p-6 bg-slate-50/50 dark:bg-slate-800/50 flex-shrink-0">
+            {/* Recording Status */}
+            {(isRecording || isTranscribing) && (
+              <div className="mb-3 flex items-center justify-center">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+                  {isTranscribing ? (
+                    <>
+                      <Sparkles className="h-4 w-4 text-blue-500 animate-spin" />
+                      <span className="text-sm text-blue-600 dark:text-blue-400">Transcribing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                      <span className="text-sm text-red-600 dark:text-red-400">
+                        Recording {formatRecordingDuration(recordingDuration)}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={onSubmit}>
               {/* Input Field with embedded icons */}
               <div className="relative">
@@ -489,9 +654,11 @@ export function ChatInterface() {
                       onSubmit(e as any)
                     }
                   }}
-                  placeholder={isRecording ? "" : "Type your message..."}
+                  placeholder={
+                    isRecording ? "Recording..." : isTranscribing ? "Transcribing..." : "Type your message..."
+                  }
                   className="w-full min-h-[2.5rem] sm:min-h-[3rem] lg:min-h-[3.5rem] max-h-[7.5rem] sm:max-h-[8rem] rounded-xl border-2 border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm pl-3 sm:pl-4 lg:pl-5 pr-16 sm:pr-20 lg:pr-24 py-2 sm:py-2.5 lg:py-3 text-sm sm:text-base focus:border-violet-500/70 dark:focus:border-violet-400/70 focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-violet-400/20 focus:outline-none transition-all duration-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none overflow-y-hidden touch-manipulation"
-                  disabled={isRecording || isLoading}
+                  disabled={isRecording || isLoading || isTranscribing}
                   rows={1}
                   style={{
                     height: "auto",
@@ -502,15 +669,6 @@ export function ChatInterface() {
                   onInput={(e) => adjustTextareaHeight(e.target as HTMLTextAreaElement)}
                 />
 
-                {/* Voice Recording Indicator */}
-                {isRecording && (
-                  <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 flex space-x-1">
-                    <div className="w-1 h-3 sm:w-1.5 sm:h-4 bg-red-500 rounded-full animate-pulse" />
-                    <div className="w-1 h-3 sm:w-1.5 sm:h-4 bg-red-500 rounded-full animate-pulse [animation-delay:0.2s]" />
-                    <div className="w-1 h-3 sm:w-1.5 sm:h-4 bg-red-500 rounded-full animate-pulse [animation-delay:0.4s]" />
-                  </div>
-                )}
-
                 {/* Right side icons container */}
                 <div className="absolute right-2 sm:right-3 top-[45%] -translate-y-1/2 flex items-center gap-1 sm:gap-2">
                   {/* Voice Input Button */}
@@ -519,25 +677,29 @@ export function ChatInterface() {
                     size="icon"
                     variant="ghost"
                     onClick={handleVoiceInput}
+                    disabled={microphonePermission === false || isLoading}
                     className={cn(
                       "w-7 h-7 sm:w-8 sm:h-8 lg:w-9 lg:h-9 rounded-lg transition-all duration-200 hover:scale-105 touch-manipulation",
-                      isRecording
-                        ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                        : "text-slate-600 dark:text-slate-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 hover:text-violet-600 dark:hover:text-violet-400",
+                      getMicrophoneButtonClass(),
                     )}
+                    title={
+                      microphonePermission === false
+                        ? "Microphone permission required"
+                        : isTranscribing
+                          ? "Transcribing audio..."
+                          : isRecording
+                            ? "Stop recording"
+                            : "Start voice input"
+                    }
                   >
-                    {isRecording ? (
-                      <StopCircle className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 animate-pulse" />
-                    ) : (
-                      <Mic className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
-                    )}
+                    {getMicrophoneIcon()}
                   </Button>
 
                   {/* Send Button */}
                   <Button
                     type="submit"
                     size="icon"
-                    disabled={!input.trim() || isLoading}
+                    disabled={!input.trim() || isLoading || isRecording || isTranscribing}
                     className="w-7 h-7 sm:w-8 sm:h-8 lg:w-9 lg:h-9 rounded-lg bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100 touch-manipulation"
                   >
                     <Send className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
@@ -545,6 +707,14 @@ export function ChatInterface() {
                 </div>
               </div>
             </form>
+
+            {/* Microphone Permission Warning */}
+            {microphonePermission === false && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+                <AlertCircle className="h-3 w-3" />
+                <span>Microphone access required for voice input</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
