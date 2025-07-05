@@ -1,4 +1,6 @@
-import { openai } from "@ai-sdk/openai"
+// import { openai } from "@ai-sdk/openai"
+import OpenAI from "openai";
+const openai = new OpenAI();
 
 export const maxDuration = 30
 
