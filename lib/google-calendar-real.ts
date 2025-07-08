@@ -19,6 +19,13 @@ export interface CalendarEvent {
   status: "confirmed" | "tentative" | "cancelled"
   created: string
   updated: string
+  reminders?: {
+    useDefault: boolean
+    overrides?: Array<{
+      method: "email" | "sms" | "popup"
+      minutes: number
+    }>
+  }
 }
 
 export interface CreateEventData {
@@ -29,7 +36,15 @@ export interface CreateEventData {
   location?: string
   attendees?: string[]
   timeZone?: string
+  reminders?: {
+    useDefault: boolean
+    overrides?: Array<{
+      method: "email" | "sms" | "popup"
+      minutes: number
+    }>
+  }
 }
+
 export interface AuthState {
   isAuthenticated: boolean
   accessToken: string | null
@@ -87,12 +102,30 @@ class RealGoogleCalendarService {
   }
 
   async createEvent(eventData: CreateEventData): Promise<CalendarEvent> {
+    // Set default reminders: 2 days before and day of
+    const defaultReminders = {
+      useDefault: false,
+      overrides: [
+        { method: "email" as const, minutes: 2880 }, // 2 days before (48 hours * 60 minutes)
+        { method: "sms" as const, minutes: 2880 }, // 2 days before via SMS
+        { method: "email" as const, minutes: 1440 }, // 1 day before (24 hours * 60 minutes)
+        { method: "sms" as const, minutes: 1440 }, // 1 day before via SMS
+        { method: "email" as const, minutes: 60 }, // 1 hour before
+        { method: "popup" as const, minutes: 15 }, // 15 minutes before (popup)
+      ],
+    }
+
+    const eventWithReminders = {
+      ...eventData,
+      reminders: eventData.reminders || defaultReminders,
+    }
+
     const response = await fetch("/api/calendar/events", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(eventData),
+      body: JSON.stringify(eventWithReminders),
     })
 
     if (!response.ok) {

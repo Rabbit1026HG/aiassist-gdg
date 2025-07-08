@@ -15,9 +15,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar, Clock, MapPin, Users, Sparkles } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Calendar, Clock, MapPin, Users, Sparkles, Bell, Mail, Smartphone } from "lucide-react"
 import { calendarService } from "@/lib/calendar-service"
-import { CreateEventData } from "@/lib/google-calendar-real"
+import type { CreateEventData } from "@/lib/google-calendar-real"
 
 interface EventModalProps {
   isOpen: boolean
@@ -36,6 +37,9 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
     endTime: "10:00",
     location: "",
     attendees: "",
+    enableReminders: true,
+    // emailReminders: true,
+    // smsReminders: true,
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,6 +50,35 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
       const startDateTime = new Date(`${formData.date}T${formData.startTime}:00`).toISOString()
       const endDateTime = new Date(`${formData.date}T${formData.endTime}:00`).toISOString()
 
+      // Configure reminders based on user preferences
+      let reminders = undefined
+      if (formData.enableReminders) {
+        const reminderOverrides = []
+
+        // if (formData.emailReminders) {
+          reminderOverrides.push(
+            { method: "email" as const, minutes: 2880 }, // 2 days before
+            { method: "email" as const, minutes: 1440 }, // 1 day before
+            { method: "email" as const, minutes: 60 }, // 1 hour before
+          )
+        // }
+
+        // if (formData.smsReminders) {
+        //   reminderOverrides.push(
+        //     { method: "sms" as const, minutes: 2880 }, // 2 days before
+        //     { method: "sms" as const, minutes: 1440 }, // 1 day before
+        //   )
+        // }
+
+        // Always add popup reminder
+        reminderOverrides.push({ method: "popup" as const, minutes: 15 })
+
+        reminders = {
+          useDefault: false,
+          overrides: reminderOverrides,
+        }
+      }
+
       const eventData: CreateEventData = {
         title: formData.title,
         description: formData.description,
@@ -53,6 +86,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
         endDateTime,
         location: formData.location,
         attendees: formData.attendees ? formData.attendees.split(",").map((email) => email.trim()) : undefined,
+        reminders,
       }
 
       await calendarService.createEvent(eventData)
@@ -68,6 +102,9 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
         endTime: "10:00",
         location: "",
         attendees: "",
+        enableReminders: true,
+        // emailReminders: true,
+        // smsReminders: true,
       })
     } catch (error) {
       console.error("Error creating event:", error)
@@ -76,7 +113,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
     }
   }
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -94,7 +131,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                   Create New Event
                 </DialogTitle>
                 <DialogDescription className="text-sm text-slate-600 dark:text-slate-300">
-                  Add a new event to your Google Calendar
+                  Add a new event to your Google Calendar with reminders
                 </DialogDescription>
               </div>
             </div>
@@ -235,6 +272,34 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                   Example: john@example.com, jane@example.com
                 </p>
               </div>
+
+              {/* Reminder Settings */}
+              <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-3">
+                  <Bell className="h-4 w-4 text-orange-500" />
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Reminder Settings</Label>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Enable Reminders */}
+                  <div className="flex items-center justify-between">
+                    {/* <Label htmlFor="enableReminders" className="text-sm text-slate-600 dark:text-slate-400">
+                      Enable reminders
+                    </Label> */}
+                    <div className="flex items-center gap-2">
+                          <Mail className="h-3 w-3 text-blue-500" />
+                          <Label htmlFor="emailReminders" className="text-sm text-slate-600 dark:text-slate-400">
+                            Email reminders (2 days, 1 day, 1 hour before)
+                          </Label>
+                        </div>
+                    <Switch
+                      id="enableReminders"
+                      checked={formData.enableReminders}
+                      onCheckedChange={(checked) => handleInputChange("enableReminders", checked)}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Footer Buttons */}
@@ -243,7 +308,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                 type="button"
                 variant="outline"
                 onClick={onClose}
-                className="w-full sm:w-auto border-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 h-10 sm:h-11 text-sm"
+                className="w-full sm:w-auto border-2 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 h-10 sm:h-11 text-sm bg-transparent"
               >
                 Cancel
               </Button>
