@@ -21,6 +21,13 @@ export interface CalendarEvent {
   status: "confirmed" | "tentative" | "cancelled"
   created: string
   updated: string
+  reminders?: {
+    useDefault: boolean
+    overrides?: Array<{
+      method: "email" | "sms" | "popup"
+      minutes: number
+    }>
+  }
 }
 
 export interface CreateEventData {
@@ -31,6 +38,13 @@ export interface CreateEventData {
   location?: string
   attendees?: string[]
   timeZone?: string
+  reminders?: {
+    useDefault: boolean
+    overrides?: Array<{
+      method: "email" | "sms" | "popup"
+      minutes: number
+    }>
+  }
 }
 
 export interface AuthState {
@@ -249,6 +263,7 @@ class ServerGoogleCalendarService {
           status: item.status,
           created: item.created,
           updated: item.updated,
+          reminders: item.reminders,
         })) || []
       )
     } catch (error) {
@@ -259,6 +274,19 @@ class ServerGoogleCalendarService {
 
   async createEvent(eventData: CreateEventData): Promise<CalendarEvent> {
     const accessToken = await this.ensureValidToken()
+
+    // Set default reminders if not provided
+    const defaultReminders = {
+      useDefault: false,
+      overrides: [
+        { method: "email", minutes: 2880 }, // 2 days before (48 hours * 60 minutes)
+        { method: "sms", minutes: 2880 }, // 2 days before via SMS
+        { method: "email", minutes: 1440 }, // 1 day before (24 hours * 60 minutes)
+        { method: "sms", minutes: 1440 }, // 1 day before via SMS
+        { method: "email", minutes: 60 }, // 1 hour before
+        { method: "popup", minutes: 15 }, // 15 minutes before (popup)
+      ],
+    }
 
     const event = {
       summary: eventData.title,
@@ -273,6 +301,7 @@ class ServerGoogleCalendarService {
       },
       location: eventData.location,
       attendees: eventData.attendees?.map((email) => ({ email })),
+      reminders: eventData.reminders || defaultReminders,
     }
 
     try {
@@ -291,7 +320,11 @@ class ServerGoogleCalendarService {
       }
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorData = await response.json()
+        console.error("Google Calendar API Error:", errorData)
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorData.error?.message || "Unknown error"}`,
+        )
       }
 
       const createdEvent = await response.json()
@@ -316,6 +349,7 @@ class ServerGoogleCalendarService {
         status: createdEvent.status,
         created: createdEvent.created,
         updated: createdEvent.updated,
+        reminders: createdEvent.reminders,
       }
     } catch (error) {
       console.error("Error creating event:", error)
@@ -344,6 +378,9 @@ class ServerGoogleCalendarService {
     if (eventData.location) event.location = eventData.location
     if (eventData.attendees) {
       event.attendees = eventData.attendees.map((email) => ({ email }))
+    }
+    if (eventData.reminders) {
+      event.reminders = eventData.reminders
     }
 
     try {
@@ -387,6 +424,7 @@ class ServerGoogleCalendarService {
         status: updatedEvent.status,
         created: updatedEvent.created,
         updated: updatedEvent.updated,
+        reminders: updatedEvent.reminders,
       }
     } catch (error) {
       console.error("Error updating event:", error)
