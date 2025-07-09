@@ -1,34 +1,49 @@
-// Static user data - no database needed
+import { cookies } from "next/headers"
+
 export interface User {
   id: string
   email: string
   name: string
-  password: string
+  provider: "email" | "google"
 }
 
-export const STATIC_USERS: User[] = [
+// Static user data
+const STATIC_USERS: User[] = [
   {
     id: "1",
     email: "rabbit1026hg@gmail.com",
     name: "Development User",
-    password: "test!@#123",
+    provider: "email",
   },
   {
     id: "2",
     email: "George@GDGreenberglaw.com",
     name: "George Greenberg",
-    password: "test!@#123",
+    provider: "email",
   },
 ]
 
-// Simple token utilities without JWT dependencies
+export function findUserByEmail(email: string): User | null {
+  return STATIC_USERS.find((user) => user.email.toLowerCase() === email.toLowerCase()) || null
+}
+
+export function validatePassword(email: string, password: string): boolean {
+  const user = findUserByEmail(email)
+  if (!user) return false
+
+  // Simple password validation for development
+  return password === "test!@#123"
+}
+
 export function createToken(user: User): string {
   const payload = {
     userId: user.id,
     email: user.email,
     name: user.name,
+    provider: user.provider,
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
   }
+
   return Buffer.from(JSON.stringify(payload)).toString("base64")
 }
 
@@ -44,18 +59,34 @@ export function verifyToken(token: string): User | null {
       id: payload.userId,
       email: payload.email,
       name: payload.name,
-      password: "", // Don't include password in verified token
+      provider: payload.provider,
     }
   } catch {
     return null
   }
 }
 
-export function authenticateUser(email: string, password: string): User | null {
-  const user = STATIC_USERS.find((u) => u.email === email && u.password === password)
-  return user || null
+export async function getAuthUser(): Promise<User | null> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get("auth-token")?.value
+
+  if (!token) return null
+
+  return verifyToken(token)
 }
 
-export function findUserByEmail(email: string): User | null {
-  return STATIC_USERS.find((u) => u.email === email) || null
+export async function setAuthCookie(token: string) {
+  const cookieStore = await cookies()
+  cookieStore.set("auth-token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+    path: "/",
+  })
+}
+
+export async function clearAuthCookie() {
+  const cookieStore = await cookies()
+  cookieStore.delete("auth-token")
 }

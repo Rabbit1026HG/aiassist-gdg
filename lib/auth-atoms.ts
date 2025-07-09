@@ -1,16 +1,13 @@
 import { atom } from "jotai"
 import { atomWithStorage } from "jotai/utils"
 
-export interface AuthUser {
+export interface User {
   id: string
   email: string
   name: string
+  provider: "email" | "google"
 }
 
-// Auth state atoms
-export const authUserAtom = atom<AuthUser | null>(null)
+export const authUserAtom = atom<User | null>(null)
 export const authLoadingAtom = atom<boolean>(false)
 export const authTokenAtom = atomWithStorage<string | null>("auth-token", null)
-
-// Derived atoms
-export const isAuthenticatedAtom = atom((get) => get(authUserAtom) !== null)

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { clearAuthCookie } from "@/lib/auth-utils"
+import { clearAuthCookie } from "@/lib/auth"
 
 export async function POST() {
-  const response = NextResponse.json({ success: true })
-
-  // Clear auth cookie
-  const cookieOptions = clearAuthCookie()
-  response.cookies.set(cookieOptions)
-
-  return response
+  try {
+    await clearAuthCookie()
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Logout error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }

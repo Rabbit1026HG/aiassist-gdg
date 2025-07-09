@@ -47,7 +47,7 @@ export interface CreateEventData {
   }
 }
 
-export interface AuthState {
+export interface CalendarAuthState {
   isAuthenticated: boolean
   accessToken: string | null
   refreshToken: string | null
@@ -61,9 +61,9 @@ class ServerGoogleCalendarService {
     expiresAt: number | null
   }> {
     const cookieStore = await cookies()
-    const accessToken = cookieStore.get("google_access_token")?.value || null
-    const refreshToken = cookieStore.get("google_refresh_token")?.value || null
-    const expiresAt = cookieStore.get("google_expires_at")?.value
+    const accessToken = cookieStore.get("google_calendar_access_token")?.value || null
+    const refreshToken = cookieStore.get("google_calendar_refresh_token")?.value || null
+    const expiresAt = cookieStore.get("google_calendar_expires_at")?.value
 
     return {
       accessToken,
@@ -76,8 +76,8 @@ class ServerGoogleCalendarService {
     const cookieStore = await cookies()
     const expiresAt = Date.now() + expiresIn * 1000
 
-    // Set secure HTTP-only cookies
-    cookieStore.set("google_access_token", accessToken, {
+    // Set secure HTTP-only cookies with calendar-specific names
+    cookieStore.set("google_calendar_access_token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -85,7 +85,7 @@ class ServerGoogleCalendarService {
     })
 
     if (refreshToken) {
-      cookieStore.set("google_refresh_token", refreshToken, {
+      cookieStore.set("google_calendar_refresh_token", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
@@ -93,7 +93,7 @@ class ServerGoogleCalendarService {
       })
     }
 
-    cookieStore.set("google_expires_at", expiresAt.toString(), {
+    cookieStore.set("google_calendar_expires_at", expiresAt.toString(), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -103,12 +103,12 @@ class ServerGoogleCalendarService {
 
   async clearTokens(): Promise<void> {
     const cookieStore = await cookies()
-    cookieStore.delete("google_access_token")
-    cookieStore.delete("google_refresh_token")
-    cookieStore.delete("google_expires_at")
+    cookieStore.delete("google_calendar_access_token")
+    cookieStore.delete("google_calendar_refresh_token")
+    cookieStore.delete("google_calendar_expires_at")
   }
 
-  async getAuthState(): Promise<AuthState> {
+  async getAuthState(): Promise<CalendarAuthState> {
     const { accessToken, refreshToken, expiresAt } = await this.getStoredTokens()
 
     return {
@@ -122,7 +122,7 @@ class ServerGoogleCalendarService {
   getAuthUrl(): string {
     const params = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID || "",
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI || "",
+      redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/auth/callback`,
       scope: "https://www.googleapis.com/auth/calendar",
       response_type: "code",
       access_type: "offline",
@@ -143,7 +143,7 @@ class ServerGoogleCalendarService {
         client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
         code,
         grant_type: "authorization_code",
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI || "",
+        redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/calendar/auth/callback`,
       }),
     })
 

@@ -1,34 +1,21 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { verifyToken } from "./lib/auth"
-import { log } from "console"
 
-// Routes that don't require authentication
-const publicRoutes = [ "/login", "/api/auth"]
+const publicPaths = ["/login", "/api/auth"]
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Check if route is public
-  const isPublicRoute = publicRoutes.some((route) =>pathname ==="/" || pathname === route || pathname.startsWith(route))
-
-  if (isPublicRoute) {
+  // Allow public paths
+  if (publicPaths.some((path) =>pathname === "/" || pathname.startsWith(path))) {
     return NextResponse.next()
   }
 
-  // Check authentication for protected routes
+  // Check authentication
   const token = request.cookies.get("auth-token")?.value
 
-  if (!token) {
-    const loginUrl = new URL("/login", request.url)
-    loginUrl.searchParams.set("redirect", pathname)
-    return NextResponse.redirect(loginUrl)
-  }
-
-  // Verify token
-  const user = verifyToken(token)
-
-  if (!user) {
+  if (!token || !verifyToken(token)) {
     const loginUrl = new URL("/login", request.url)
     loginUrl.searchParams.set("redirect", pathname)
     return NextResponse.redirect(loginUrl)
@@ -38,5 +25,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
 }

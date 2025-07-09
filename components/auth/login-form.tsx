@@ -22,7 +22,8 @@ export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const redirectUrl = searchParams.get("redirect") || "/dashboard"
+  const redirectTo = searchParams.get("redirect") || "/dashboard"
+  const oauthError = searchParams.get("error")
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,11 +43,11 @@ export function LoginForm() {
 
       if (response.ok) {
         setUser(data.user)
-        router.push(redirectUrl)
+        router.push(redirectTo)
       } else {
         setError(data.error || "Login failed")
       }
-    } catch (err) {
+    } catch (error) {
       setError("Network error. Please try again.")
     } finally {
       setLoading(false)
@@ -54,7 +55,7 @@ export function LoginForm() {
   }
 
   const handleGoogleLogin = () => {
-    window.location.href = `/api/auth/google?redirect=${encodeURIComponent(redirectUrl)}`
+    window.location.href = "/api/auth/google"
   }
 
   return (
@@ -65,9 +66,18 @@ export function LoginForm() {
           <CardDescription className="text-center">Enter your credentials to access your account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && (
+          {(error || oauthError) && (
             <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                {error ||
+                  (oauthError === "unauthorized"
+                    ? "Your email is not authorized to access this application."
+                    : oauthError === "oauth_error"
+                      ? "OAuth authentication failed."
+                      : oauthError === "oauth_failed"
+                        ? "Google authentication failed."
+                        : "Authentication error occurred.")}
+              </AlertDescription>
             </Alert>
           )}
 

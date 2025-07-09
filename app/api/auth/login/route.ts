@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { authenticateUser, createToken } from "@/lib/auth"
-import { setAuthCookie } from "@/lib/auth-utils"
+import { findUserByEmail, validatePassword, createToken, setAuthCookie } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,30 +9,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
     }
 
-    // Authenticate user
-    const user = authenticateUser(email, password)
-
-    if (!user) {
+    const user = findUserByEmail(email)
+    if (!user || !validatePassword(email, password)) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
     }
 
-    // Create token
     const token = createToken(user)
+    await setAuthCookie(token)
 
-    // Create response with user data
-    const response = NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-      },
-    })
-
-    // Set auth cookie
-    const cookieOptions = setAuthCookie(token)
-    response.cookies.set(cookieOptions)
-
-    return response
+    return NextResponse.json({ user })
   } catch (error) {
     console.error("Login error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

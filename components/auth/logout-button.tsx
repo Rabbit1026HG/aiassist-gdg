@@ -8,9 +8,10 @@ import { LogOut } from "lucide-react"
 
 interface LogoutButtonProps {
   size?: "sm" | "default" | "lg"
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
 }
 
-export function LogoutButton({ size = "default" }: LogoutButtonProps) {
+export function LogoutButton({ size = "default", variant = "ghost" }: LogoutButtonProps) {
   const [, setUser] = useAtom(authUserAtom)
   const router = useRouter()
 
@@ -20,14 +21,14 @@ export function LogoutButton({ size = "default" }: LogoutButtonProps) {
       setUser(null)
       router.push("/login")
     } catch (error) {
-      console.error("Logout error:", error)
+      console.error("Logout failed:", error)
     }
   }
 
   return (
-    <Button variant="ghost" size={size === "sm" ? "sm" : "icon"} onClick={handleLogout}>
-      <LogOut className="h-4 w-4" />
-      {size === "sm" && <span className="ml-2">Logout</span>}
+    <Button variant={variant} size={size} onClick={handleLogout}>
+      <LogOut className="h-4 w-4 mr-2" />
+      Logout
     </Button>
   )
 }

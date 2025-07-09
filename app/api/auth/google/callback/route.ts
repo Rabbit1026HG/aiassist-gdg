@@ -1,75 +1,68 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { findUserByEmail, createToken } from "@/lib/auth"
-import { setAuthCookie } from "@/lib/auth-utils"
+import { createToken, setAuthCookie } from "@/lib/auth"
+import { isAuthorizedEmail, createGoogleUser } from "@/lib/auth-utils"
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const code = searchParams.get("code")
-  const state = searchParams.get("state")
-  const error = searchParams.get("error")
-
-  if (error) {
-    return NextResponse.redirect(new URL("/login?error=google_auth_failed", request.url))
-  }
-
-  if (!code) {
-    return NextResponse.redirect(new URL("/login?error=no_code", request.url))
-  }
-
   try {
-    // Exchange code for access token
+    const { searchParams } = new URL(request.url)
+    const code = searchParams.get("code")
+    const error = searchParams.get("error")
+
+    if (error) {
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login?error=oauth_error`)
+    }
+
+    if (!code) {
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login?error=no_code`)
+    }
+
+    // Exchange code for tokens
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        client_id: process.env.GOOGLE_CLIENT_ID || "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
         code,
         grant_type: "authorization_code",
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
+        redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`,
       }),
     })
 
-    const tokenData = await tokenResponse.json()
-
-    if (!tokenData.access_token) {
-      throw new Error("No access token received")
+    if (!tokenResponse.ok) {
+      throw new Error("Failed to exchange code for tokens")
     }
 
-    // Get user info from Google
+    const tokens = await tokenResponse.json()
+
+    // Get user info
     const userResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: {
-        Authorization: `Bearer ${tokenData.access_token}`,
+        Authorization: `Bearer ${tokens.access_token}`,
       },
     })
+
+    if (!userResponse.ok) {
+      throw new Error("Failed to get user info")
+    }
 
     const googleUser = await userResponse.json()
 
     // Check if user is authorized
-    const user = findUserByEmail(googleUser.email)
-
-    if (!user) {
-      return NextResponse.redirect(new URL("/login?error=unauthorized_email", request.url))
+    if (!isAuthorizedEmail(googleUser.email)) {
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login?error=unauthorized`)
     }
 
-    // Create token
+    // Create user and token
+    const user = createGoogleUser(googleUser.email, googleUser.name)
     const token = createToken(user)
+    await setAuthCookie(token)
 
-    // Determine redirect URL
-    const redirectUrl = state ? Buffer.from(state, "base64").toString() : "/dashboard"
-
-    // Create response
-    const response = NextResponse.redirect(new URL(redirectUrl, request.url))
-
-    // Set auth cookie
-    const cookieOptions = setAuthCookie(token)
-    response.cookies.set(cookieOptions)
-
-    return response
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dashboard`)
   } catch (error) {
-    console.error("Google OAuth error:", error)
-    return NextResponse.redirect(new URL("/login?error=google_auth_failed", request.url))
+    console.error("Google OAuth callback error:", error)
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login?error=oauth_failed`)
   }
 }

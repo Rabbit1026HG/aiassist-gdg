@@ -1,18 +1,16 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const redirectUrl = searchParams.get("redirect") || "/dashboard"
+export async function GET() {
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID || "",
+    redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`,
+    scope: "openid email profile",
+    response_type: "code",
+    access_type: "offline",
+    prompt: "consent",
+  })
 
-  // Store redirect URL in state parameter
-  const state = Buffer.from(redirectUrl).toString("base64")
+  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
 
-  const googleAuthUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth")
-  googleAuthUrl.searchParams.set("client_id", process.env.GOOGLE_CLIENT_ID!)
-  googleAuthUrl.searchParams.set("redirect_uri", process.env.GOOGLE_REDIRECT_URI!)
-  googleAuthUrl.searchParams.set("response_type", "code")
-  googleAuthUrl.searchParams.set("scope", "email profile")
-  googleAuthUrl.searchParams.set("state", state)
-
-  return NextResponse.redirect(googleAuthUrl.toString())
+  return NextResponse.redirect(authUrl)
 }
