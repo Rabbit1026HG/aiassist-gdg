@@ -1,5 +1,10 @@
-import { MagicLinkForm } from "@/components/auth/magic-link-form"
+import { Suspense } from "react";
+import { LoginForm } from "@/components/auth/login-form";
 
 export default function LoginPage() {
-  return <MagicLinkForm />
+  return (
+    <Suspense fallback={<div>Loading calendar...</div>}>
+      <LoginForm />
+    </Suspense>
+  );
 }

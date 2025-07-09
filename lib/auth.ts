@@ -1,69 +1,92 @@
-// Simple auth utilities for magic link authentication
+import { cookies } from "next/headers"
+
 export interface User {
   id: string
   email: string
-  name?: string
+  name: string
+  provider: "email" | "google"
 }
 
-export async function sendMagicLink(email: string): Promise<{ success: boolean; message: string }> {
+// Static user data
+const STATIC_USERS: User[] = [
+  {
+    id: "1",
+    email: "rabbit1026hg@gmail.com",
+    name: "Development User",
+    provider: "email",
+  },
+  {
+    id: "2",
+    email: "George@GDGreenberglaw.com",
+    name: "George Greenberg",
+    provider: "email",
+  },
+]
+
+export function findUserByEmail(email: string): User | null {
+  return STATIC_USERS.find((user) => user.email.toLowerCase() === email.toLowerCase()) || null
+}
+
+export function validatePassword(email: string, password: string): boolean {
+  const user = findUserByEmail(email)
+  if (!user) return false
+
+  // Simple password validation for development
+  return password === "test!@#123"
+}
+
+export function createToken(user: User): string {
+  const payload = {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    provider: user.provider,
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+  }
+
+  return Buffer.from(JSON.stringify(payload)).toString("base64")
+}
+
+export function verifyToken(token: string): User | null {
   try {
-    // In a real application, this would:
-    // 1. Generate a secure token
-    // 2. Store it in a database with expiration
-    // 3. Send an email with the magic link
+    const payload = JSON.parse(Buffer.from(token, "base64").toString())
 
-    const token = generateSecureToken()
-    const magicLink = `${window.location.origin}/auth/verify?token=${token}`
-
-    // Simulate email sending
-    console.log(`Magic link sent to ${email}: ${magicLink}`)
+    if (payload.exp < Date.now()) {
+      return null // Token expired
+    }
 
     return {
-      success: true,
-      message: "Magic link sent successfully",
+      id: payload.userId,
+      email: payload.email,
+      name: payload.name,
+      provider: payload.provider,
     }
-  } catch (error) {
-    return {
-      success: false,
-      message: "Failed to send magic link",
-    }
+  } catch {
+    return null
   }
 }
 
-export function generateSecureToken(): string {
-  // Generate a secure random token
-  const array = new Uint8Array(32)
-  crypto.getRandomValues(array)
-  return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("")
+export async function getAuthUser(): Promise<User | null> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get("auth-token")?.value
+
+  if (!token) return null
+
+  return verifyToken(token)
 }
 
-export async function verifyMagicLink(token: string): Promise<{ success: boolean; user?: User }> {
-  try {
-    // In a real application, this would:
-    // 1. Verify the token exists in the database
-    // 2. Check if it's not expired
-    // 3. Return the associated user
-
-    // For demo purposes, accept any token
-    if (token && token.length > 10) {
-      return {
-        success: true,
-        user: {
-          id: "user-1",
-          email: "user@example.com",
-          name: "AI Assistant User",
-        },
-      }
-    }
-
-    return { success: false }
-  } catch (error) {
-    return { success: false }
-  }
+export async function setAuthCookie(token: string) {
+  const cookieStore = await cookies()
+  cookieStore.set("auth-token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+    path: "/",
+  })
 }
 
-export function isAuthenticated(): boolean {
-  // In a real application, this would check for valid session/token
-  // For demo purposes, always return true if we're on dashboard
-  return typeof window !== "undefined" && window.location.pathname.startsWith("/dashboard")
+export async function clearAuthCookie() {
+  const cookieStore = await cookies()
+  cookieStore.delete("auth-token")
 }

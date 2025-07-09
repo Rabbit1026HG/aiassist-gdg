@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { calendarService } from "@/lib/calendar-service"
-import type { AuthState } from "@/lib/google-calendar-real"
+import type { CalendarAuthState } from "@/lib/google-calendar-server"
 import { Calendar, CheckCircle, AlertCircle, ExternalLink, RefreshCw } from "lucide-react"
 
 interface AuthPanelProps {
@@ -14,18 +14,48 @@ interface AuthPanelProps {
 }
 
 export function GoogleCalendarAuthPanel({ onAuthChange }: AuthPanelProps) {
-  const [authState, setAuthState] = useState<AuthState | null>(null)
+  const [authState, setAuthState] = useState<CalendarAuthState | null>(null)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     checkAuthState()
-  }, [])
+
+    // Check for URL parameters indicating success or error
+    const calendarError = searchParams.get("calendar_error")
+    const calendarSuccess = searchParams.get("calendar_success")
+
+    if (calendarError) {
+      setError(
+        calendarError === "oauth_error"
+          ? "Calendar OAuth authentication failed."
+          : calendarError === "no_code"
+            ? "No authorization code received."
+            : calendarError === "oauth_failed"
+              ? "Calendar authentication failed."
+              : "Calendar authentication error occurred.",
+      )
+    }
+
+    if (calendarSuccess === "connected") {
+      setSuccess("Successfully connected to Google Calendar!")
+      setTimeout(() => setSuccess(null), 5000)
+    }
+  }, [searchParams])
 
   const checkAuthState = async () => {
-    const state = await calendarService.getAuthState()
-    setAuthState(state)
-    onAuthChange?.(state?.isAuthenticated || false)
+    try {
+      const response = await fetch("/api/calendar/auth/status")
+      if (response.ok) {
+        const state = await response.json()
+        setAuthState(state)
+        onAuthChange?.(state?.isAuthenticated || false)
+      }
+    } catch (err) {
+      console.error("Failed to check calendar auth state:", err)
+    }
   }
 
   const handleAuthenticate = async () => {
@@ -33,11 +63,8 @@ export function GoogleCalendarAuthPanel({ onAuthChange }: AuthPanelProps) {
     setError(null)
 
     try {
-      const authUrl = await calendarService.authenticate()
-      if (typeof authUrl === "string") {
-        // Redirect to Google OAuth
-        window.location.href = authUrl
-      }
+      // Redirect to calendar auth endpoint
+      window.location.href = "/api/calendar/auth"
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed")
       setIsAuthenticating(false)
@@ -45,9 +72,17 @@ export function GoogleCalendarAuthPanel({ onAuthChange }: AuthPanelProps) {
   }
 
   const handleDisconnect = async () => {
-    await calendarService.clearAuthentication()
-    await checkAuthState()
-    setError(null)
+    try {
+      const response = await fetch("/api/calendar/auth/logout", { method: "POST" })
+      if (response.ok) {
+        await checkAuthState()
+        setError(null)
+        setSuccess("Disconnected from Google Calendar")
+        setTimeout(() => setSuccess(null), 3000)
+      }
+    } catch (err) {
+      setError("Failed to disconnect from calendar")
+    }
   }
 
   return (
@@ -63,6 +98,13 @@ export function GoogleCalendarAuthPanel({ onAuthChange }: AuthPanelProps) {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {success && (
+          <Alert>
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
 
