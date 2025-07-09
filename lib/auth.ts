@@ -1,69 +1,61 @@
-// Simple auth utilities for magic link authentication
+// Static user data - no database needed
 export interface User {
   id: string
   email: string
-  name?: string
+  name: string
+  password: string
 }
 
-export async function sendMagicLink(email: string): Promise<{ success: boolean; message: string }> {
+export const STATIC_USERS: User[] = [
+  {
+    id: "1",
+    email: "rabbit1026hg@gmail.com",
+    name: "Development User",
+    password: "test!@#123",
+  },
+  {
+    id: "2",
+    email: "George@GDGreenberglaw.com",
+    name: "George Greenberg",
+    password: "test!@#123",
+  },
+]
+
+// Simple token utilities without JWT dependencies
+export function createToken(user: User): string {
+  const payload = {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+  }
+  return Buffer.from(JSON.stringify(payload)).toString("base64")
+}
+
+export function verifyToken(token: string): User | null {
   try {
-    // In a real application, this would:
-    // 1. Generate a secure token
-    // 2. Store it in a database with expiration
-    // 3. Send an email with the magic link
+    const payload = JSON.parse(Buffer.from(token, "base64").toString())
 
-    const token = generateSecureToken()
-    const magicLink = `${window.location.origin}/auth/verify?token=${token}`
-
-    // Simulate email sending
-    console.log(`Magic link sent to ${email}: ${magicLink}`)
+    if (payload.exp < Date.now()) {
+      return null // Token expired
+    }
 
     return {
-      success: true,
-      message: "Magic link sent successfully",
+      id: payload.userId,
+      email: payload.email,
+      name: payload.name,
+      password: "", // Don't include password in verified token
     }
-  } catch (error) {
-    return {
-      success: false,
-      message: "Failed to send magic link",
-    }
+  } catch {
+    return null
   }
 }
 
-export function generateSecureToken(): string {
-  // Generate a secure random token
-  const array = new Uint8Array(32)
-  crypto.getRandomValues(array)
-  return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("")
+export function authenticateUser(email: string, password: string): User | null {
+  const user = STATIC_USERS.find((u) => u.email === email && u.password === password)
+  return user || null
 }
 
-export async function verifyMagicLink(token: string): Promise<{ success: boolean; user?: User }> {
-  try {
-    // In a real application, this would:
-    // 1. Verify the token exists in the database
-    // 2. Check if it's not expired
-    // 3. Return the associated user
-
-    // For demo purposes, accept any token
-    if (token && token.length > 10) {
-      return {
-        success: true,
-        user: {
-          id: "user-1",
-          email: "user@example.com",
-          name: "AI Assistant User",
-        },
-      }
-    }
-
-    return { success: false }
-  } catch (error) {
-    return { success: false }
-  }
-}
-
-export function isAuthenticated(): boolean {
-  // In a real application, this would check for valid session/token
-  // For demo purposes, always return true if we're on dashboard
-  return typeof window !== "undefined" && window.location.pathname.startsWith("/dashboard")
+export function findUserByEmail(email: string): User | null {
+  return STATIC_USERS.find((u) => u.email === email) || null
 }

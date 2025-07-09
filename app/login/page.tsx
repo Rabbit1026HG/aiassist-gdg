@@ -1,5 +1,5 @@
-import { MagicLinkForm } from "@/components/auth/magic-link-form"
+import { LoginForm } from "@/components/auth/login-form"
 
 export default function LoginPage() {
-  return <MagicLinkForm />
+  return <LoginForm />
 }
