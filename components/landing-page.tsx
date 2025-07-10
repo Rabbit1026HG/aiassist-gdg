@@ -3,10 +3,36 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
-import { Brain, Calendar, MessageSquare, Clock, Shield, Sparkles, Zap, Globe } from "lucide-react"
+import { Brain, Calendar, MessageSquare, Clock, Shield, Sparkles, Zap, Globe, Loader2, ArrowRight } from "lucide-react"
 import Image from "next/image"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 export function LandingPage() {
+    const [isCheckingAuth, setIsCheckingAuth] = useState(false)
+  const router = useRouter()
+
+  const handleGetStarted = async () => {
+    setIsCheckingAuth(true)
+
+    try {
+      const response = await fetch("/api/auth/me")
+
+      if (response.ok) {
+        // User is logged in, redirect to dashboard
+        router.push("/dashboard")
+      } else {
+        // User is not logged in, redirect to login
+        router.push("/login")
+      }
+    } catch (error) {
+      console.error("Auth check failed:", error)
+      // On error, redirect to login
+      router.push("/login")
+    } finally {
+      setIsCheckingAuth(false)
+    }
+  }
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 dark:from-slate-950 dark:via-slate-900 dark:to-violet-950">
       <header className="border-b border-slate-200/50 dark:border-slate-700/50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-50">
@@ -16,11 +42,19 @@ export function LandingPage() {
           </div>
           <div className="flex items-center gap-4">
             <ModeToggle />
-            <Link href="/login">
-              <Button className="bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                Get Started
+              <Button onClick={handleGetStarted}
+              disabled={isCheckingAuth} className="bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                 {isCheckingAuth ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  Get Started
+                </>
+              )}
               </Button>
-            </Link>
           </div>
         </div>
       </header>
@@ -45,14 +79,24 @@ export function LandingPage() {
                 reminders. Experience the future of personal productivity.
               </p>
               <div className="flex flex-col gap-4 sm:flex-row">
-                <Link href="/login">
                   <Button
                     size="lg"
                     className="bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 px-8 py-6 text-lg"
+                    onClick={handleGetStarted}
+              disabled={isCheckingAuth}
                   >
-                    Get Started
+                      {isCheckingAuth ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  Get Started
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </>
+              )}
                   </Button>
-                </Link>
                 
               </div>
             </div>
