@@ -1,49 +1,19 @@
 import { cookies } from "next/headers"
+import { pantryService } from "./pantry-service"
 
 export interface User {
   id: string
   email: string
   name: string
-  provider: "email" | "google"
-}
-
-// Static user data
-const STATIC_USERS: User[] = [
-  {
-    id: "1",
-    email: "rabbit1026hg@gmail.com",
-    name: "Development User",
-    provider: "email",
-  },
-  {
-    id: "2",
-    email: "George@GDGreenberglaw.com",
-    name: "George Greenberg",
-    provider: "email",
-  },
-]
-
-export function findUserByEmail(email: string): User | null {
-  return STATIC_USERS.find((user) => user.email.toLowerCase() === email.toLowerCase()) || null
-}
-
-export function validatePassword(email: string, password: string): boolean {
-  const user = findUserByEmail(email)
-  if (!user) return false
-
-  // Simple password validation for development
-  return password === "test!@#123"
 }
 
 export function createToken(user: User): string {
   const payload = {
-    userId: user.id,
+    id: user.id,
     email: user.email,
     name: user.name,
-    provider: user.provider,
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
   }
-
   return Buffer.from(JSON.stringify(payload)).toString("base64")
 }
 
@@ -56,12 +26,92 @@ export function verifyToken(token: string): User | null {
     }
 
     return {
-      id: payload.userId,
+      id: payload.id,
       email: payload.email,
       name: payload.name,
-      provider: payload.provider,
     }
   } catch {
+    return null
+  }
+}
+
+export async function validateCredentials(email: string, password: string): Promise<User | null> {
+  try {
+    const pantryUser = await pantryService.validateCredentials(email, password)
+    if (!pantryUser) return null
+
+    return {
+      id: pantryUser.id,
+      email: pantryUser.email,
+      name: pantryUser.name,
+    }
+  } catch (error) {
+    console.error("Error validating credentials:", error)
+    return null
+  }
+}
+
+export async function changeUserPassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<boolean> {
+  try {
+    // First verify the current password
+    const user = await pantryService.findUserById(userId)
+    if (!user) {
+      console.error("User not found:", userId)
+      return false
+    }
+
+    if (user.password !== currentPassword) {
+      console.error("Current password is incorrect")
+      return false
+    }
+
+    // Update password in Pantry
+    const success = await pantryService.updateUserPassword(userId, newPassword)
+    if (success) {
+      console.log("Password updated successfully for user:", userId)
+    } else {
+      console.error("Failed to update password in Pantry")
+    }
+
+    return success
+  } catch (error) {
+    console.error("Error changing password:", error)
+    return false
+  }
+}
+
+export async function getUserByEmail(email: string): Promise<User | null> {
+  try {
+    const pantryUser = await pantryService.findUserByEmail(email)
+    if (!pantryUser) return null
+
+    return {
+      id: pantryUser.id,
+      email: pantryUser.email,
+      name: pantryUser.name,
+    }
+  } catch (error) {
+    console.error("Error getting user by email:", error)
+    return null
+  }
+}
+
+export async function getUserById(id: string): Promise<User | null> {
+  try {
+    const pantryUser = await pantryService.findUserById(id)
+    if (!pantryUser) return null
+
+    return {
+      id: pantryUser.id,
+      email: pantryUser.email,
+      name: pantryUser.name,
+    }
+  } catch (error) {
+    console.error("Error getting user by ID:", error)
     return null
   }
 }
@@ -89,4 +139,13 @@ export async function setAuthCookie(token: string) {
 export async function clearAuthCookie() {
   const cookieStore = await cookies()
   cookieStore.delete("auth-token")
+}
+
+// Initialize Pantry on server startup
+export async function initializeAuth() {
+  try {
+    await pantryService.initializePantry()
+  } catch (error) {
+    console.error("Failed to initialize auth:", error)
+  }
 }

@@ -5,9 +5,7 @@ export interface User {
   id: string
   email: string
   name: string
-  provider: "email" | "google"
 }
 
-export const authUserAtom = atom<User | null>(null)
-export const authLoadingAtom = atom<boolean>(false)
-export const authTokenAtom = atomWithStorage<string | null>("auth-token", null)
+export const authUserAtom = atomWithStorage<User | null>("auth-user", null)
+export const authLoadingAtom = atom(false)
