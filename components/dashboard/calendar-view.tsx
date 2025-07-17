@@ -1,16 +1,33 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import type React from "react"
+
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Plus, CalendarIcon, Clock, MapPin, Users, Loader2 } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  CalendarIcon,
+  Clock,
+  MapPin,
+  Users,
+  Loader2,
+  Edit,
+  Trash2,
+  MoreVertical,
+} from "lucide-react"
 import { EventModal } from "@/components/calendar/event-modal"
+import type { CalendarEvent } from "@/lib/google-calendar-real"
 import { cn } from "@/lib/utils"
 import { calendarService } from "@/lib/calendar-service"
 import { GoogleCalendarAuthPanel } from "@/components/calendar/auth-panel"
-import { CalendarEvent } from "@/lib/google-calendar-real"
+import { EditEventModal } from "@/components/calendar/edit-event-modal"
+import { DeleteEventDialog } from "@/components/calendar/delete-event-dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -20,6 +37,12 @@ export function CalendarView() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | undefined>()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
+  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     loadEventsForCurrentMonth()
@@ -43,6 +66,20 @@ export function CalendarView() {
       console.error("OAuth error:", error)
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [])
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+        setIsContextMenuOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [])
 
@@ -129,6 +166,43 @@ export function CalendarView() {
 
   const handleEventCreated = () => {
     loadEventsForCurrentMonth() // Use the new function name
+  }
+
+  const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedEvent(event)
+    setIsEditModalOpen(true)
+  }
+
+  const handleEventUpdated = () => {
+    loadEventsForCurrentMonth()
+    setSelectedEvent(null)
+  }
+
+  const handleEventDeleted = () => {
+    loadEventsForCurrentMonth()
+    setSelectedEvent(null)
+  }
+
+  const handleDeleteEvent = (event: CalendarEvent, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    setSelectedEvent(event)
+    setIsDeleteDialogOpen(true)
+    setIsContextMenuOpen(false)
+  }
+
+  const handleEventContextMenu = (event: CalendarEvent, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setSelectedEvent(event)
+    setContextMenuPosition({ x: e.clientX, y: e.clientY })
+    setIsContextMenuOpen(true)
+  }
+
+  const handleEditEvent = (event: CalendarEvent) => {
+    setSelectedEvent(event)
+    setIsEditModalOpen(true)
+    setIsContextMenuOpen(false)
   }
 
   const getDaysInMonth = (year: number, month: number) => {
@@ -231,11 +305,49 @@ export function CalendarView() {
             {dayEvents.slice(0, 3).map((event, index) => (
               <div
                 key={event.id}
-                className={cn("text-xs p-1 rounded text-white truncate animate-fade-in", getEventColor(index))}
+                className={cn(
+                  "text-xs p-1 rounded text-white truncate animate-fade-in cursor-pointer hover:opacity-80 transition-opacity group relative",
+                  getEventColor(index),
+                )}
                 title={`${event.title} - ${formatTime(event.start.dateTime)}`}
+                onClick={(e) => handleEventClick(event, e)}
+                onContextMenu={(e) => handleEventContextMenu(event, e)}
               >
                 <div className="font-medium truncate">{event.title}</div>
                 <div className="text-xs opacity-90">{formatTime(event.start.dateTime)}</div>
+                <div className="absolute right-0.5 top-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 bg-white/20 hover:bg-white/40 rounded-full p-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreVertical className="h-2 w-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-32">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditEvent(event)
+                        }}
+                      >
+                        <Edit className="mr-2 h-3 w-3" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-red-600 dark:text-red-400"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteEvent(event)
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-3 w-3" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             ))}
             {dayEvents.length > 3 && (
@@ -279,7 +391,9 @@ export function CalendarView() {
           {weekEvents.map((event, index) => (
             <Card
               key={event.id}
-              className="modern-card hover:shadow-xl transition-all duration-300 transform hover:scale-105 animate-fade-in"
+              className="modern-card hover:shadow-xl transition-all duration-300 transform hover:scale-105 animate-fade-in cursor-pointer relative group"
+              onClick={(e) => handleEventClick(event, e)}
+              onContextMenu={(e) => handleEventContextMenu(event, e)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
@@ -310,6 +424,27 @@ export function CalendarView() {
                       )}
                     </div>
                   </div>
+                </div>
+                <div className="absolute top-2 right-2 lg:opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleEditEvent(event)
+                    }}
+                    className="h-7 w-7 p-0 rounded-full bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => handleDeleteEvent(event, e)}
+                    className="h-7 w-7 p-0 rounded-full bg-slate-100/80 dark:bg-slate-800/80 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -352,10 +487,35 @@ export function CalendarView() {
                   <div className={cn("w-4 h-4 rounded-full mt-1 flex-shrink-0", getEventColor(index))} />
                   <div className="flex-1">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{event.title}</h3>
-                      <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
-                        <Clock className="h-4 w-4" />
-                        {formatTime(event.start.dateTime)} - {formatTime(event.end.dateTime)}
+                      <h3
+                        className="text-lg font-semibold text-slate-900 dark:text-slate-100 cursor-pointer hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+                        onClick={(e) => handleEventClick(event, e)}
+                      >
+                        {event.title}
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+                          <Clock className="h-4 w-4" />
+                          {formatTime(event.start.dateTime)} - {formatTime(event.end.dateTime)}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => handleEventClick(event, e)}
+                            className="h-8 px-2 text-xs hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-300 dark:hover:border-amber-600"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => handleDeleteEvent(event, e)}
+                            className="h-8 px-2 text-xs hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 dark:hover:border-red-600 text-red-600 dark:text-red-400"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
 
@@ -451,7 +611,10 @@ export function CalendarView() {
           Google Calendar
         </div>
         <Button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setSelectedDate(new Date())
+            setIsModalOpen(true)
+          }}
           className="bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
         >
           <Plus className="mr-2 h-4 w-4" /> New Event
@@ -468,7 +631,7 @@ export function CalendarView() {
                 variant="outline"
                 size="sm"
                 onClick={navigatePrevious}
-                className="hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                className="hover:bg-violet-50 dark:hover:bg-violet-900/20 bg-transparent"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -476,7 +639,7 @@ export function CalendarView() {
                 variant="outline"
                 size="sm"
                 onClick={navigateToday}
-                className="hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                className="hover:bg-emerald-50 dark:hover:bg-emerald-900/20 bg-transparent"
               >
                 Today
               </Button>
@@ -484,7 +647,7 @@ export function CalendarView() {
                 variant="outline"
                 size="sm"
                 onClick={navigateNext}
-                className="hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                className="hover:bg-violet-50 dark:hover:bg-violet-900/20 bg-transparent"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -529,6 +692,53 @@ export function CalendarView() {
         onEventCreated={handleEventCreated}
         selectedDate={selectedDate}
       />
+
+      <EditEventModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setSelectedEvent(null)
+        }}
+        onEventUpdated={handleEventUpdated}
+        event={selectedEvent}
+      />
+
+      <DeleteEventDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => {
+          setIsDeleteDialogOpen(false)
+          setSelectedEvent(null)
+        }}
+        onEventDeleted={handleEventDeleted}
+        event={selectedEvent}
+      />
+
+      {/* Context menu for right-click on events */}
+      {isContextMenuOpen && selectedEvent && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-50 bg-white dark:bg-slate-800 shadow-lg rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden"
+          style={{
+            top: `${contextMenuPosition.y}px`,
+            left: `${contextMenuPosition.x}px`,
+          }}
+        >
+          <div className="p-1">
+            <button
+              className="flex items-center w-full px-3 py-2 text-sm text-left hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
+              onClick={() => handleEditEvent(selectedEvent)}
+            >
+              <Edit className="mr-2 h-4 w-4" /> Edit Event
+            </button>
+            <button
+              className="flex items-center w-full px-3 py-2 text-sm text-left hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 rounded-md"
+              onClick={() => handleDeleteEvent(selectedEvent)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Delete Event
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

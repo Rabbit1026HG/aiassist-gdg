@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,41 +15,50 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Calendar, Clock, MapPin, Users, Sparkles, Bell, Mail } from "lucide-react"
+import { Calendar, Clock, MapPin, Users, Sparkles, Bell, Mail, Edit } from "lucide-react"
 import { calendarService } from "@/lib/calendar-service"
-import type { CreateEventData } from "@/lib/google-calendar-real"
+import type { CalendarEvent, CreateEventData } from "@/lib/google-calendar-real"
 import { useToast } from "@/hooks/use-toast"
 
-interface EventModalProps {
+interface EditEventModalProps {
   isOpen: boolean
   onClose: () => void
-  onEventCreated: () => void
-  selectedDate?: Date
+  onEventUpdated: () => void
+  event: CalendarEvent | null
 }
 
-export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: EventModalProps) {
+export function EditEventModal({ isOpen, onClose, onEventUpdated, event }: EditEventModalProps) {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    date: selectedDate ? selectedDate.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-    startTime: "09:00",
-    endTime: "10:00",
+    date: "",
+    startTime: "",
+    endTime: "",
     location: "",
     attendees: "",
     enableReminders: true,
   })
 
-  // Update date when selectedDate changes
+  // Populate form when event changes
   useEffect(() => {
-    if (selectedDate) {
-      setFormData((prev) => ({
-        ...prev,
-        date: selectedDate.toISOString().split("T")[0],
-      }))
+    if (event) {
+      const startDate = new Date(event.start.dateTime)
+      const endDate = new Date(event.end.dateTime)
+
+      setFormData({
+        title: event.title || "",
+        description: event.description || "",
+        date: startDate.toISOString().split("T")[0],
+        startTime: startDate.toTimeString().slice(0, 5),
+        endTime: endDate.toTimeString().slice(0, 5),
+        location: event.location || "",
+        attendees: event.attendees?.map((a) => a.email).join(", ") || "",
+        enableReminders: event.reminders ? !event.reminders.useDefault : true,
+      })
     }
-  }, [selectedDate])
+  }, [event])
 
   const validateForm = () => {
     if (!formData.title.trim()) {
@@ -79,6 +87,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!event) return
 
     if (!validateForm()) {
       return
@@ -110,7 +119,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
         }
       }
 
-      const eventData: CreateEventData = {
+      const eventData: Partial<CreateEventData> = {
         title: formData.title,
         description: formData.description,
         startDateTime,
@@ -120,31 +129,19 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
         reminders,
       }
 
-      await calendarService.createEvent(eventData)
-      onEventCreated()
+      await calendarService.updateEvent(event.id, eventData)
+      onEventUpdated()
       onClose()
 
-      // Reset form
-      setFormData({
-        title: "",
-        description: "",
-        date: new Date().toISOString().split("T")[0],
-        startTime: "09:00",
-        endTime: "10:00",
-        location: "",
-        attendees: "",
-        enableReminders: true,
-      })
-
       toast({
-        title: "Event created",
-        description: "Your event has been successfully created",
+        title: "Event updated",
+        description: "Your event has been successfully updated",
       })
     } catch (error) {
-      console.error("Error creating event:", error)
+      console.error("Error updating event:", error)
       toast({
-        title: "Failed to create event",
-        description: "There was an error creating your event. Please try again.",
+        title: "Failed to update event",
+        description: "There was an error updating your event. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -156,21 +153,23 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
+  if (!event) return null
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[95vw] max-w-[500px] max-h-[95vh] overflow-y-auto bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 shadow-2xl p-0">
         <div className="p-4 sm:p-6">
           <DialogHeader className="space-y-3 mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-violet-600 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Edit className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
               <div className="min-w-0 flex-1">
-                <DialogTitle className="text-lg sm:text-xl font-bold bg-gradient-to-r from-violet-600 to-emerald-600 bg-clip-text text-transparent">
-                  Create New Event
+                <DialogTitle className="text-lg sm:text-xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+                  Edit Event
                 </DialogTitle>
                 <DialogDescription className="text-sm text-slate-600 dark:text-slate-300">
-                  Add a new event to your Google Calendar with reminders
+                  Update your Google Calendar event details
                 </DialogDescription>
               </div>
             </div>
@@ -193,7 +192,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                   onChange={(e) => handleInputChange("title", e.target.value)}
                   placeholder="Enter event title"
                   required
-                  className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-violet-500 dark:focus:border-violet-400 rounded-xl text-sm"
+                  className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl text-sm"
                 />
               </div>
 
@@ -207,7 +206,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                   value={formData.description}
                   onChange={(e) => handleInputChange("description", e.target.value)}
                   placeholder="Add event description (optional)"
-                  className="border-2 border-slate-200 dark:border-slate-700 focus:border-violet-500 dark:focus:border-violet-400 rounded-xl resize-none text-sm"
+                  className="border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl resize-none text-sm"
                   rows={2}
                 />
               </div>
@@ -229,7 +228,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                     value={formData.date}
                     onChange={(e) => handleInputChange("date", e.target.value)}
                     required
-                    className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-violet-500 dark:focus:border-violet-400 rounded-xl text-sm w-full"
+                    className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl text-sm w-full"
                   />
                 </div>
 
@@ -249,7 +248,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                       value={formData.startTime}
                       onChange={(e) => handleInputChange("startTime", e.target.value)}
                       required
-                      className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-violet-500 dark:focus:border-violet-400 rounded-xl text-sm"
+                      className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl text-sm"
                     />
                   </div>
 
@@ -267,7 +266,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                       value={formData.endTime}
                       onChange={(e) => handleInputChange("endTime", e.target.value)}
                       required
-                      className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-violet-500 dark:focus:border-violet-400 rounded-xl text-sm"
+                      className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl text-sm"
                     />
                   </div>
                 </div>
@@ -287,7 +286,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                   value={formData.location}
                   onChange={(e) => handleInputChange("location", e.target.value)}
                   placeholder="Add location (optional)"
-                  className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-violet-500 dark:focus:border-violet-400 rounded-xl text-sm"
+                  className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl text-sm"
                 />
               </div>
 
@@ -305,7 +304,7 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                   value={formData.attendees}
                   onChange={(e) => handleInputChange("attendees", e.target.value)}
                   placeholder="Enter email addresses separated by commas"
-                  className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-violet-500 dark:focus:border-violet-400 rounded-xl text-sm"
+                  className="h-10 sm:h-11 border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl text-sm"
                 />
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Example: john@example.com, jane@example.com
@@ -320,8 +319,9 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
                 </div>
 
                 <div className="space-y-3">
-                  {/* Enable Reminders */}
-                  <div className="flex items-center justify-between">
+                 
+                      {/* Email Reminders */}
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Mail className="h-3 w-3 text-blue-500" />
                           <Label htmlFor="emailReminders" className="text-sm text-slate-600 dark:text-slate-400">
@@ -351,15 +351,15 @@ export function EventModal({ isOpen, onClose, onEventCreated, selectedDate }: Ev
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full sm:w-auto bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 h-10 sm:h-11 text-sm font-medium"
+                className="w-full sm:w-auto bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 h-10 sm:h-11 text-sm font-medium"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Creating...
+                    Updating...
                   </div>
                 ) : (
-                  "Create Event"
+                  "Update Event"
                 )}
               </Button>
             </DialogFooter>
