@@ -104,11 +104,11 @@ export function EditEventModal({ isOpen, onClose, onEventUpdated, event }: EditE
       if (formData.enableReminders) {
         const reminderOverrides = []
 
-          reminderOverrides.push(
-            { method: "email" as const, minutes: 2880 }, // 2 days before
-            { method: "email" as const, minutes: 1440 }, // 1 day before
-            { method: "email" as const, minutes: 60 }, // 1 hour before
-          )
+        reminderOverrides.push(
+          { method: "email" as const, minutes: 2880 }, // 2 days before
+          { method: "email" as const, minutes: 1440 }, // 1 day before
+          { method: "email" as const, minutes: 60 }, // 1 hour before
+        )
 
         // Always add popup reminder
         reminderOverrides.push({ method: "popup" as const, minutes: 15 })
@@ -319,21 +319,20 @@ export function EditEventModal({ isOpen, onClose, onEventUpdated, event }: EditE
                 </div>
 
                 <div className="space-y-3">
-                 
-                      {/* Email Reminders */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Mail className="h-3 w-3 text-blue-500" />
-                          <Label htmlFor="emailReminders" className="text-sm text-slate-600 dark:text-slate-400">
-                            Email reminders (2 days, 1 day, 1 hour before)
-                          </Label>
-                        </div>
-                        <Switch
-                          id="enableReminders"
-                          checked={formData.enableReminders}
-                          onCheckedChange={(checked) => handleInputChange("enableReminders", checked)}
-                        />
-                      </div>
+                  {/* Email Reminders */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-3 w-3 text-blue-500" />
+                      <Label htmlFor="emailReminders" className="text-sm text-slate-600 dark:text-slate-400">
+                        Email reminders (2 days, 1 day, 1 hour before)
+                      </Label>
+                    </div>
+                    <Switch
+                      id="enableReminders"
+                      checked={formData.enableReminders}
+                      onCheckedChange={(checked) => handleInputChange("enableReminders", checked)}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
