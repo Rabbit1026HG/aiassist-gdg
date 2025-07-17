@@ -1,6 +1,6 @@
 import { openai } from "@ai-sdk/openai"
 import { generateText } from "ai"
-import { calendarService } from "@/lib/calendar-service"
+import { serverGoogleCalendar } from "@/lib/google-calendar-server"
 import type { CreateEventData } from "@/lib/google-calendar-real"
 
 export const maxDuration = 30
@@ -77,12 +77,12 @@ Current date/time: ${new Date().toISOString()}`,
 
     // Execute the calendar action
     let actionResult = ""
-    console.log(parsedAction)
+
     try {
       switch (parsedAction.action) {
         case "create":
           if (parsedAction.eventData) {
-            const event = await calendarService.createEvent(parsedAction.eventData as CreateEventData)
+            const event = await serverGoogleCalendar.createEvent(parsedAction.eventData as CreateEventData)
             actionResult = `✅ Event "${event.title}" created successfully for ${new Date(event.start.dateTime).toLocaleString()}`
           } else {
             actionResult = "❌ I need more details to create the event. Please specify at least a title and time."
@@ -91,7 +91,7 @@ Current date/time: ${new Date().toISOString()}`,
 
         case "update":
           if (parsedAction.eventId && parsedAction.eventData) {
-            const event = await calendarService.updateEvent(parsedAction.eventId, parsedAction.eventData)
+            const event = await serverGoogleCalendar.updateEvent(parsedAction.eventId, parsedAction.eventData)
             actionResult = `✅ Event "${event.title}" updated successfully`
           } else {
             actionResult =
@@ -101,7 +101,7 @@ Current date/time: ${new Date().toISOString()}`,
 
         case "delete":
           if (parsedAction.eventId) {
-            await calendarService.deleteEvent(parsedAction.eventId)
+            await serverGoogleCalendar.deleteEvent(parsedAction.eventId)
             actionResult = "✅ Event deleted successfully"
           } else {
             actionResult =
@@ -115,7 +115,7 @@ Current date/time: ${new Date().toISOString()}`,
             end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Next 24 hours
           }
 
-          const events = await calendarService.getEvents(timeRange.start, timeRange.end)
+          const events = await serverGoogleCalendar.getEvents(timeRange.start, timeRange.end)
 
           if (events.length === 0) {
             actionResult = "📅 No events found for the specified time period."
