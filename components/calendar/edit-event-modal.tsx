@@ -15,9 +15,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Calendar, Clock, MapPin, Users, Sparkles, Bell, Mail, Smartphone, Edit } from "lucide-react"
+import { Calendar, Clock, MapPin, Users, Sparkles, Bell, Mail, Edit } from "lucide-react"
 import { calendarService } from "@/lib/calendar-service"
 import type { CalendarEvent, CreateEventData } from "@/lib/google-calendar-real"
+import { useToast } from "@/hooks/use-toast"
 
 interface EditEventModalProps {
   isOpen: boolean
@@ -27,6 +28,7 @@ interface EditEventModalProps {
 }
 
 export function EditEventModal({ isOpen, onClose, onEventUpdated, event }: EditEventModalProps) {
+  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: "",
@@ -37,8 +39,6 @@ export function EditEventModal({ isOpen, onClose, onEventUpdated, event }: EditE
     location: "",
     attendees: "",
     enableReminders: true,
-    emailReminders: true,
-    smsReminders: true,
   })
 
   // Populate form when event changes
@@ -56,15 +56,42 @@ export function EditEventModal({ isOpen, onClose, onEventUpdated, event }: EditE
         location: event.location || "",
         attendees: event.attendees?.map((a) => a.email).join(", ") || "",
         enableReminders: event.reminders ? !event.reminders.useDefault : true,
-        emailReminders: event.reminders?.overrides?.some((r) => r.method === "email") || false,
-        smsReminders: event.reminders?.overrides?.some((r) => r.method === "sms") || false,
       })
     }
   }, [event])
 
+  const validateForm = () => {
+    if (!formData.title.trim()) {
+      toast({
+        title: "Title is required",
+        description: "Please enter a title for your event",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    const startDateTime = new Date(`${formData.date}T${formData.startTime}:00`)
+    const endDateTime = new Date(`${formData.date}T${formData.endTime}:00`)
+
+    if (startDateTime >= endDateTime) {
+      toast({
+        title: "Invalid time range",
+        description: "End time must be after start time",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    return true
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!event) return
+
+    if (!validateForm()) {
+      return
+    }
 
     setIsLoading(true)
 
@@ -77,20 +104,11 @@ export function EditEventModal({ isOpen, onClose, onEventUpdated, event }: EditE
       if (formData.enableReminders) {
         const reminderOverrides = []
 
-        if (formData.emailReminders) {
           reminderOverrides.push(
             { method: "email" as const, minutes: 2880 }, // 2 days before
             { method: "email" as const, minutes: 1440 }, // 1 day before
             { method: "email" as const, minutes: 60 }, // 1 hour before
           )
-        }
-
-        if (formData.smsReminders) {
-          reminderOverrides.push(
-            { method: "sms" as const, minutes: 2880 }, // 2 days before
-            { method: "sms" as const, minutes: 1440 }, // 1 day before
-          )
-        }
 
         // Always add popup reminder
         reminderOverrides.push({ method: "popup" as const, minutes: 15 })
@@ -114,8 +132,18 @@ export function EditEventModal({ isOpen, onClose, onEventUpdated, event }: EditE
       await calendarService.updateEvent(event.id, eventData)
       onEventUpdated()
       onClose()
+
+      toast({
+        title: "Event updated",
+        description: "Your event has been successfully updated",
+      })
     } catch (error) {
       console.error("Error updating event:", error)
+      toast({
+        title: "Failed to update event",
+        description: "There was an error updating your event. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -291,20 +319,7 @@ export function EditEventModal({ isOpen, onClose, onEventUpdated, event }: EditE
                 </div>
 
                 <div className="space-y-3">
-                  {/* Enable Reminders */}
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="enableReminders" className="text-sm text-slate-600 dark:text-slate-400">
-                      Enable reminders
-                    </Label>
-                    <Switch
-                      id="enableReminders"
-                      checked={formData.enableReminders}
-                      onCheckedChange={(checked) => handleInputChange("enableReminders", checked)}
-                    />
-                  </div>
-
-                  {formData.enableReminders && (
-                    <>
+                 
                       {/* Email Reminders */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -314,32 +329,11 @@ export function EditEventModal({ isOpen, onClose, onEventUpdated, event }: EditE
                           </Label>
                         </div>
                         <Switch
-                          id="emailReminders"
-                          checked={formData.emailReminders}
-                          onCheckedChange={(checked) => handleInputChange("emailReminders", checked)}
+                          id="enableReminders"
+                          checked={formData.enableReminders}
+                          onCheckedChange={(checked) => handleInputChange("enableReminders", checked)}
                         />
                       </div>
-
-                      {/* SMS Reminders */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Smartphone className="h-3 w-3 text-green-500" />
-                          <Label htmlFor="smsReminders" className="text-sm text-slate-600 dark:text-slate-400">
-                            SMS reminders (2 days, 1 day before)
-                          </Label>
-                        </div>
-                        <Switch
-                          id="smsReminders"
-                          checked={formData.smsReminders}
-                          onCheckedChange={(checked) => handleInputChange("smsReminders", checked)}
-                        />
-                      </div>
-
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                        Note: SMS reminders require SMS notifications to be enabled in your Google Calendar settings.
-                      </p>
-                    </>
-                  )}
                 </div>
               </div>
             </div>
