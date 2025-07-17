@@ -19,6 +19,8 @@ import {
   Edit,
   Trash2,
   MoreVertical,
+  Bot,
+  Sparkles,
 } from "lucide-react"
 import { EventModal } from "@/components/calendar/event-modal"
 import type { CalendarEvent } from "@/lib/google-calendar-real"
@@ -27,6 +29,7 @@ import { calendarService } from "@/lib/calendar-service"
 import { GoogleCalendarAuthPanel } from "@/components/calendar/auth-panel"
 import { EditEventModal } from "@/components/calendar/edit-event-modal"
 import { DeleteEventDialog } from "@/components/calendar/delete-event-dialog"
+import { CalendarAIAgentModal } from "@/components/calendar/ai-agent-modal"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export function CalendarView() {
@@ -40,6 +43,7 @@ export function CalendarView() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false)
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   const contextMenuRef = useRef<HTMLDivElement>(null)
@@ -203,6 +207,10 @@ export function CalendarView() {
     setSelectedEvent(event)
     setIsEditModalOpen(true)
     setIsContextMenuOpen(false)
+  }
+
+  const handleAIAction = () => {
+    loadEventsForCurrentMonth()
   }
 
   const getDaysInMonth = (year: number, month: number) => {
@@ -610,15 +618,26 @@ export function CalendarView() {
           <div className="w-2 h-2 rounded-full bg-emerald-500" />
           Google Calendar
         </div>
-        <Button
-          onClick={() => {
-            setSelectedDate(new Date())
-            setIsModalOpen(true)
-          }}
-          className="bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-        >
-          <Plus className="mr-2 h-4 w-4" /> New Event
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setIsAIModalOpen(true)}
+            variant="outline"
+            className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200 dark:border-purple-700 hover:from-purple-100 hover:to-blue-100 dark:hover:from-purple-900/30 dark:hover:to-blue-900/30 text-purple-700 dark:text-purple-300 shadow-sm hover:shadow-md transition-all duration-300"
+          >
+            <Bot className="mr-2 h-4 w-4" />
+            <Sparkles className="mr-1 h-3 w-3" />
+            AI Assistant
+          </Button>
+          <Button
+            onClick={() => {
+              setSelectedDate(new Date())
+              setIsModalOpen(true)
+            }}
+            className="bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          >
+            <Plus className="mr-2 h-4 w-4" /> New Event
+          </Button>
+        </div>
       </div>
 
       <GoogleCalendarAuthPanel onAuthChange={setIsAuthenticated} />
@@ -711,6 +730,12 @@ export function CalendarView() {
         }}
         onEventDeleted={handleEventDeleted}
         event={selectedEvent}
+      />
+
+      <CalendarAIAgentModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
+        onEventAction={handleAIAction}
       />
 
       {/* Context menu for right-click on events */}
