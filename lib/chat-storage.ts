@@ -1,23 +1,26 @@
+import { supabase } from "./supabase"
 import type { Conversation, ChatMessage, CreateConversationData } from "./types/chat"
 
-class ChatStorageService {
-  private readonly CONVERSATIONS_KEY = "ai_assistant_conversations"
-  private readonly MESSAGES_KEY = "ai_assistant_messages"
 
+class ChatStorageService {
   // Conversation management
   async getConversations(): Promise<Conversation[]> {
     try {
-      const stored = localStorage.getItem(this.CONVERSATIONS_KEY)
-      if (!stored) return []
+      const { data, error } = await supabase.from("conversations").select("*").order("updated_at", { ascending: false })
 
-      const conversations = JSON.parse(stored) as Conversation[]
-      return conversations
-        .map((conv) => ({
-          ...conv,
-          createdAt: new Date(conv.createdAt),
-          updatedAt: new Date(conv.updatedAt),
-        }))
-        .sort((a, b) => b.updatedAt.getTime() - a.createdAt.getTime())
+      if (error) {
+        console.error("Error loading conversations:", error)
+        return []
+      }
+
+      return (data || []).map((conv) => ({
+        id: conv.id,
+        title: conv.title,
+        createdAt: new Date(conv.created_at),
+        updatedAt: new Date(conv.updated_at),
+        messageCount: conv.message_count,
+        lastMessage: conv.last_message || undefined,
+      }))
     } catch (error) {
       console.error("Error loading conversations:", error)
       return []
@@ -25,63 +28,134 @@ class ChatStorageService {
   }
 
   async getConversation(id: string): Promise<Conversation | null> {
-    const conversations = await this.getConversations()
-    return conversations.find((conv) => conv.id === id) || null
+    try {
+      // If it's a temporary ID, return null
+      if (id.startsWith("temp-")) {
+        return null
+      }
+
+      const { data, error } = await supabase.from("conversations").select("*").eq("id", id).single()
+
+      if (error || !data) {
+        console.error("Error loading conversation:", error)
+        return null
+      }
+
+      return {
+        id: data.id,
+        title: data.title,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+        messageCount: data.message_count,
+        lastMessage: data.last_message || undefined,
+      }
+    } catch (error) {
+      console.error("Error loading conversation:", error)
+      return null
+    }
   }
 
   async createConversation(data: CreateConversationData = {}): Promise<Conversation> {
-    const id = this.generateId()
-    const now = new Date()
+    try {
+      const { data: newConversation, error } = await supabase
+        .from("conversations")
+        .insert({
+          title: data.title || "New Conversation",
+          message_count: 0,
+          last_message: data.firstMessage || null,
+        })
+        .select()
+        .single()
 
-    const conversation: Conversation = {
-      id,
-      title: data.title || "New Conversation",
-      createdAt: now,
-      updatedAt: now,
-      messageCount: 0,
-      lastMessage: data.firstMessage,
+      if (error || !newConversation) {
+        throw new Error(error?.message || "Failed to create conversation")
+      }
+
+      return {
+        id: newConversation.id,
+        title: newConversation.title,
+        createdAt: new Date(newConversation.created_at),
+        updatedAt: new Date(newConversation.updated_at),
+        messageCount: newConversation.message_count,
+        lastMessage: newConversation.last_message || undefined,
+      }
+    } catch (error) {
+      console.error("Error creating conversation:", error)
+      throw error
     }
-
-    const conversations = await this.getConversations()
-    conversations.unshift(conversation)
-
-    localStorage.setItem(this.CONVERSATIONS_KEY, JSON.stringify(conversations))
-    return conversation
   }
 
   async updateConversation(id: string, updates: Partial<Conversation>): Promise<void> {
-    const conversations = await this.getConversations()
-    const index = conversations.findIndex((conv) => conv.id === id)
-
-    if (index !== -1) {
-      conversations[index] = {
-        ...conversations[index],
-        ...updates,
-        updatedAt: new Date(),
+    try {
+      // Skip update for temporary conversations
+      if (id.startsWith("temp-")) {
+        return
       }
-      localStorage.setItem(this.CONVERSATIONS_KEY, JSON.stringify(conversations))
+
+      const updateData: any = {}
+
+      if (updates.title !== undefined) updateData.title = updates.title
+      if (updates.messageCount !== undefined) updateData.message_count = updates.messageCount
+      if (updates.lastMessage !== undefined) updateData.last_message = updates.lastMessage
+
+      // Always update the updated_at timestamp
+      updateData.updated_at = new Date().toISOString()
+
+      const { error } = await supabase.from("conversations").update(updateData).eq("id", id)
+
+      if (error) {
+        throw new Error(error.message)
+      }
+    } catch (error) {
+      console.error("Error updating conversation:", error)
+      throw error
     }
   }
 
   async deleteConversation(id: string): Promise<void> {
-    const conversations = await this.getConversations()
-    const filtered = conversations.filter((conv) => conv.id !== id)
-    localStorage.setItem(this.CONVERSATIONS_KEY, JSON.stringify(filtered))
+    try {
+      // Skip delete for temporary conversations
+      if (id.startsWith("temp-")) {
+        return
+      }
 
-    // Also delete all messages for this conversation
-    await this.deleteConversationMessages(id)
+      // Delete conversation (messages will be deleted automatically due to CASCADE)
+      const { error } = await supabase.from("conversations").delete().eq("id", id)
+
+      if (error) {
+        throw new Error(error.message)
+      }
+    } catch (error) {
+      console.error("Error deleting conversation:", error)
+      throw error
+    }
   }
 
   // Message management
   async getMessages(conversationId: string): Promise<ChatMessage[]> {
     try {
-      const stored = localStorage.getItem(`${this.MESSAGES_KEY}_${conversationId}`)
-      if (!stored) return []
+      // Return empty array for temporary conversations
+      if (conversationId.startsWith("temp-")) {
+        return []
+      }
 
-      const messages = JSON.parse(stored) as ChatMessage[]
-      return messages.map((msg) => ({
-        ...msg,
-        createdAt: new Date(msg.createdAt),
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true })
+
+      if (error) {
+        console.error("Error loading messages:", error)
+        return []
+      }
+
+      return (data || []).map((msg) => ({
+        id: msg.id,
+        conversationId: msg.conversation_id,
+        role: msg.role,
+        content: msg.content,
+        createdAt: new Date(msg.created_at),
       }))
     } catch (error) {
       console.error("Error loading messages:", error)
@@ -90,31 +164,76 @@ class ChatStorageService {
   }
 
   async addMessage(conversationId: string, role: "user" | "assistant", content: string): Promise<ChatMessage> {
-    const message: ChatMessage = {
-      id: this.generateId(),
-      conversationId,
-      role,
-      content,
-      createdAt: new Date(),
+    try {
+      // Skip adding message for temporary conversations
+      if (conversationId.startsWith("temp-")) {
+        // Return a mock message for temporary conversations
+        return {
+          id: `temp-msg-${Date.now()}`,
+          conversationId,
+          role,
+          content,
+          createdAt: new Date(),
+        }
+      }
+
+      const { data: newMessage, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          role,
+          content,
+        })
+        .select()
+        .single()
+
+      if (error || !newMessage) {
+        throw new Error(error?.message || "Failed to add message")
+      }
+
+      // Update conversation metadata
+      const { data: messages } = await supabase.from("messages").select("id").eq("conversation_id", conversationId)
+
+      const messageCount = messages?.length || 0
+
+      await supabase
+        .from("conversations")
+        .update({
+          message_count: messageCount,
+          last_message: content.slice(0, 100),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", conversationId)
+
+      return {
+        id: newMessage.id,
+        conversationId: newMessage.conversation_id,
+        role: newMessage.role,
+        content: newMessage.content,
+        createdAt: new Date(newMessage.created_at),
+      }
+    } catch (error) {
+      console.error("Error adding message:", error)
+      throw error
     }
-
-    const messages = await this.getMessages(conversationId)
-    messages.push(message)
-
-    localStorage.setItem(`${this.MESSAGES_KEY}_${conversationId}`, JSON.stringify(messages))
-
-    // Update conversation metadata
-    await this.updateConversation(conversationId, {
-      messageCount: messages.length,
-      lastMessage: content.slice(0, 100),
-      updatedAt: new Date(),
-    })
-
-    return message
   }
 
   async deleteConversationMessages(conversationId: string): Promise<void> {
-    localStorage.removeItem(`${this.MESSAGES_KEY}_${conversationId}`)
+    try {
+      // Skip delete for temporary conversations
+      if (conversationId.startsWith("temp-")) {
+        return
+      }
+
+      const { error } = await supabase.from("messages").delete().eq("conversation_id", conversationId)
+
+      if (error) {
+        throw new Error(error.message)
+      }
+    } catch (error) {
+      console.error("Error deleting messages:", error)
+      throw error
+    }
   }
 
   async generateConversationTitle(firstMessage: string): Promise<string> {
@@ -123,31 +242,38 @@ class ChatStorageService {
     return words.length > 50 ? words.slice(0, 47) + "..." : words || "New Conversation"
   }
 
-  private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2)
-  }
-
   // Utility methods
   async clearAllData(): Promise<void> {
-    const conversations = await this.getConversations()
-    conversations.forEach((conv) => {
-      localStorage.removeItem(`${this.MESSAGES_KEY}_${conv.id}`)
-    })
-    localStorage.removeItem(this.CONVERSATIONS_KEY)
+    try {
+      // Delete all conversations (messages will be deleted automatically due to CASCADE)
+      const { error } = await supabase.from("conversations").delete().neq("id", "00000000-0000-0000-0000-000000000000") // Delete all records
+
+      if (error) {
+        throw new Error(error.message)
+      }
+    } catch (error) {
+      console.error("Error clearing all data:", error)
+      throw error
+    }
   }
 
   async exportConversation(id: string): Promise<string> {
-    const conversation = await this.getConversation(id)
-    const messages = await this.getMessages(id)
+    try {
+      const conversation = await this.getConversation(id)
+      const messages = await this.getMessages(id)
 
-    return JSON.stringify(
-      {
-        conversation,
-        messages,
-      },
-      null,
-      2,
-    )
+      return JSON.stringify(
+        {
+          conversation,
+          messages,
+        },
+        null,
+        2,
+      )
+    } catch (error) {
+      console.error("Error exporting conversation:", error)
+      throw error
+    }
   }
 }
 

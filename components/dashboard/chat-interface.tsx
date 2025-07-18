@@ -37,7 +37,7 @@ export function ChatInterface() {
     api: "/api/chat",
     initialMessages: [],
     onFinish: async (message) => {
-      if (currentConversation && hasUserMessages) {
+      if (currentConversation && hasUserMessages && !currentConversation.id.startsWith("temp-")) {
         await chatStorage.addMessage(currentConversation.id, "assistant", message.content)
         // Refresh conversations list to show updated message count
         loadConversations()
@@ -368,13 +368,13 @@ export function ChatInterface() {
         })
         return
       }
-    } else if (currentConversation && hasUserMessages) {
+    } else if (currentConversation && hasUserMessages && !currentConversation.id.startsWith("temp-")) {
       // Store user message for existing conversation
       await chatStorage.addMessage(currentConversation.id, "user", input.trim())
     }
 
     // Update conversation title if it's the first user message
-    if (currentConversation && !hasUserMessages) {
+    if (currentConversation && !hasUserMessages && !currentConversation.id.startsWith("temp-")) {
       const title = await chatStorage.generateConversationTitle(input.trim())
       await chatStorage.updateConversation(currentConversation.id, { title })
       setCurrentConversation((prev) => (prev ? { ...prev, title } : null))
