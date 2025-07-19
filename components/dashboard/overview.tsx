@@ -3,403 +3,547 @@
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, CheckCircle2, Clock, Mic, Plus, Send, Sparkles, TrendingUp, Zap, RefreshCw } from "lucide-react"
+import {
+  MessageSquare,
+  Clock,
+  TrendingUp,
+  Zap,
+  RefreshCw,
+  Calendar,
+  User,
+  Activity,
+  Database,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react"
 import { useState, useEffect } from "react"
-// import { generateSuggestions } from "@/lib/ai-service"
+import { chatStorage } from "@/lib/chat-storage"
+import { useAuth } from "@/components/auth/auth-provider"
+import type { Conversation } from "@/lib/types/chat"
+import Link from "next/link"
+
+interface DashboardStats {
+  totalConversations: number
+  totalMessages: number
+  todayMessages: number
+  weekMessages: number
+  recentConversations: Conversation[]
+  systemStatus: {
+    database: boolean
+    ai: boolean
+    calendar: boolean
+  }
+}
 
 export function DashboardOverview() {
-  const [inputValue, setInputValue] = useState("")
-  const [isRecording, setIsRecording] = useState(false)
-  const [aiSuggestions, setAiSuggestions] = useState<string[]>([])
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
-
-  // George's actual activities and schedule
-  const mockTasks = [
-    "Prepare will documents for morning client signing",
-    "Review trust amendments for Henderson client",
-    "Practice Serrada Escrima forms - evening session",
-    "Research Nevada probate law updates",
-    "Prepare theatre acting lesson plans",
-  ]
-
-  const mockEvents = [
-    { title: "Client Signing - Estate Planning", date: new Date(2025, 5, 12, 9, 0) },
-    { title: "Theatre Acting Class", date: new Date(2025, 5, 12, 14, 0) },
-    { title: "Jazz Piano Practice", date: new Date(2025, 5, 12, 16, 0) },
-    { title: "Martial Arts Training", date: new Date(2025, 5, 13, 17, 0) },
-  ]
-
-  const mockPreferences = {
-    workingHours: "5-21", // 5 AM to 9 PM schedule
-    timezone: "America/Los_Angeles", // Las Vegas timezone
-    clientSignings: "morning-only",
-    sleepSchedule: "21:00-05:00",
-    homeOffice: true,
-    disciplines: ["law", "theatre", "martial-arts", "music", "research"],
-  }
+  const [stats, setStats] = useState<DashboardStats>({
+    totalConversations: 0,
+    totalMessages: 0,
+    todayMessages: 0,
+    weekMessages: 0,
+    recentConversations: [],
+    systemStatus: {
+      database: true,
+      ai: true,
+      calendar: true,
+    },
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const { user } = useAuth()
 
   useEffect(() => {
-    loadAISuggestions()
+    loadDashboardData()
   }, [])
 
-  const loadAISuggestions = async () => {
-    setIsLoadingSuggestions(true)
+  const loadDashboardData = async () => {
+    setIsLoading(true)
     try {
-      const res = await fetch("/api/assistant/suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tasks: mockTasks,
-          events: mockEvents,
-          preferences: mockPreferences,
-        }),
+      // Load real chat data
+      const conversations = await chatStorage.getConversations()
+
+      // Calculate statistics
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+      let totalMessages = 0
+      let todayMessages = 0
+      let weekMessages = 0
+
+      // Get message counts for each conversation
+      for (const conversation of conversations) {
+        const messages = await chatStorage.getMessages(conversation.id)
+        totalMessages += messages.length
+
+        // Count messages from today
+        const todayMsgs = messages.filter((msg) => new Date(msg.createdAt) >= today).length
+        todayMessages += todayMsgs
+
+        // Count messages from this week
+        const weekMsgs = messages.filter((msg) => new Date(msg.createdAt) >= weekAgo).length
+        weekMessages += weekMsgs
+      }
+
+      // Check system status
+      const systemStatus = await checkSystemStatus()
+
+      setStats({
+        totalConversations: conversations.length,
+        totalMessages,
+        todayMessages,
+        weekMessages,
+        recentConversations: conversations.slice(0, 5), // Get 5 most recent
+        systemStatus,
       })
 
-      if (!res.ok) throw new Error(await res.text())
-
-      const data = await res.json()
-      setAiSuggestions(data.suggestions)
+      setLastUpdated(new Date())
     } catch (error) {
-      console.error("Error loading AI suggestions:", error)
-      setAiSuggestions([
-        "Prepare for your upcoming design meeting by reviewing project materials",
-        "Consider scheduling buffer time between your back-to-back meetings",
-        "Set up automated reminders for your expense report deadline",
-      ])
+      console.error("Error loading dashboard data:", error)
+      // Set error state but don't crash
+      setStats((prev) => ({
+        ...prev,
+        systemStatus: {
+          database: false,
+          ai: true,
+          calendar: true,
+        },
+      }))
     } finally {
-      setIsLoadingSuggestions(false)
+      setIsLoading(false)
     }
   }
 
-  const handleVoiceInput = () => {
-    setIsRecording(!isRecording)
-    if (!isRecording) {
-      setTimeout(() => {
-        setInputValue("Schedule a meeting with the design team tomorrow at 10 AM")
-        setIsRecording(false)
-      }, 2000)
+  const checkSystemStatus = async () => {
+    const status = {
+      database: true,
+      ai: true,
+      calendar: true,
     }
+
+    try {
+      // Test database connection
+      await chatStorage.getConversations()
+      status.database = true
+    } catch {
+      status.database = false
+    }
+
+    try {
+      // Test AI service
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "test" }] }),
+      })
+      status.ai = response.ok
+    } catch {
+      status.ai = false
+    }
+
+    try {
+      // Test calendar auth status
+      const response = await fetch("/api/calendar/auth/status")
+      const data = await response.json()
+      status.calendar = data.isAuthenticated || false
+    } catch {
+      status.calendar = false
+    }
+
+    return status
   }
 
-  // Mock functions to simulate conversation handling
-  const setMessages = (messages: any) => {
-    console.log("Setting messages:", messages)
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour >= 5 && hour < 12) return "Good morning"
+    if (hour >= 12 && hour < 17) return "Good afternoon"
+    return "Good evening"
   }
 
-  const handleConversationSelect = (conversation: any) => {
-    console.log("Selected conversation:", conversation)
-    const formattedMessages = conversation.messages.map((message: any) => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      createdAt: new Date(message.createdAt),
-    }))
-
-    formattedMessages.unshift({
-      id: "welcome",
-      role: "assistant",
-      content:
-        "Hi, George! I'm Thea, your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
-      createdAt: new Date(),
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     })
-    setMessages(formattedMessages)
   }
 
-  const startTemporaryConversation = () => {
-    setMessages([
-      {
-        id: "welcome",
-        role: "assistant",
-        content:
-          "Hi, George! I'm Thea, your personal AI assistant, familiar with your daily schedule, your solo legal work in Wills & Trusts, and your interests in theatre, martial arts, jazz piano, and research. How can I help you manage your day and tasks?",
-      },
-    ])
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
   }
+
+  const getActivityLevel = () => {
+    if (stats.todayMessages >= 10)
+      return {
+        level: "High",
+        color: "text-emerald-600",
+        bg: "bg-emerald-50 dark:bg-emerald-900/20",
+        border: "border-emerald-200 dark:border-emerald-800",
+      }
+    if (stats.todayMessages >= 5)
+      return {
+        level: "Medium",
+        color: "text-amber-600",
+        bg: "bg-amber-50 dark:bg-amber-900/20",
+        border: "border-amber-200 dark:border-amber-800",
+      }
+    return {
+      level: "Low",
+      color: "text-slate-600",
+      bg: "bg-slate-50 dark:bg-slate-800/50",
+      border: "border-slate-200 dark:border-slate-700",
+    }
+  }
+
+  const activity = getActivityLevel()
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-violet-600 to-emerald-600 bg-clip-text text-transparent">
-            Dashboard
-          </h1>
-          <p className="text-slate-600 dark:text-slate-300 mt-1">Welcome back! Here's your productivity overview.</p>
-        </div>
-        <Button className="bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-          <Plus className="mr-2 h-4 w-4" /> New Task
-        </Button>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="modern-card hover:shadow-xl transition-all duration-300 transform hover:scale-105 border-l-4 border-l-violet-500">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Tasks Today</CardTitle>
-            <div className="w-8 h-8 bg-gradient-to-r from-violet-500 to-purple-500 rounded-lg flex items-center justify-center">
-              <CheckCircle2 className="h-4 w-4 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">5</div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3 text-emerald-500" />2 completed, 3 remaining
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="modern-card hover:shadow-xl transition-all duration-300 transform hover:scale-105 border-l-4 border-l-emerald-500">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Upcoming Meetings</CardTitle>
-            <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center">
-              <Calendar className="h-4 w-4 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">3</div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Next: Design Team at 10:00 AM</p>
-          </CardContent>
-        </Card>
-
-        <Card className="modern-card hover:shadow-xl transition-all duration-300 transform hover:scale-105 border-l-4 border-l-amber-500">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Reminders</CardTitle>
-            <div className="w-8 h-8 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg flex items-center justify-center">
-              <Clock className="h-4 w-4 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">2</div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Submit report by 5:00 PM</p>
-          </CardContent>
-        </Card>
-
-        <Card className="modern-card hover:shadow-xl transition-all duration-300 transform hover:scale-105 border-l-4 border-l-pink-500">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">AI Suggestions</CardTitle>
-            <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{aiSuggestions.length}</div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Powered by OpenAI</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs defaultValue="tasks" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-          <TabsTrigger
-            value="tasks"
-            className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm"
-          >
-            Tasks
-          </TabsTrigger>
-          <TabsTrigger
-            value="calendar"
-            className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm"
-          >
-            Calendar
-          </TabsTrigger>
-          <TabsTrigger
-            value="suggestions"
-            className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm"
-          >
-            AI Suggestions
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="tasks" className="space-y-4">
-          <Card className="modern-card">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {[
-                  {
-                    id: "task1",
-                    text: "Prepare presentation for client meeting",
-                    time: "Today, 2:00 PM",
-                    completed: false,
-                  },
-                  { id: "task2", text: "Review quarterly report draft", time: "Today, 4:00 PM", completed: false },
-                  { id: "task3", text: "Submit expense reports", time: "Today, 5:00 PM", completed: false },
-                  { id: "task4", text: "Schedule team meeting", time: "Completed", completed: true },
-                  { id: "task5", text: "Send project update email", time: "Completed", completed: true },
-                ].map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      id={task.id}
-                      className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-                      checked={task.completed}
-                      readOnly
-                    />
-                    <label htmlFor={task.id} className={cn("flex-1", task.completed && "line-through text-slate-500")}>
-                      {task.text}
-                    </label>
-                    <span className={cn("text-sm", task.completed ? "text-emerald-600" : "text-slate-500")}>
-                      {task.time}
-                    </span>
-                  </div>
-                ))}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 -m-8 p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Hero Section */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 via-purple-600 to-emerald-600 p-8 text-white shadow-2xl">
+          <div className="absolute inset-0 bg-black/10" />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-4xl font-bold mb-2">
+                  {getGreeting()}, {user?.name?.split(" ")[0] || "George"}!
+                </h1>
+                <p className="text-white/90 text-lg">{formatDate(new Date())} • Your personal AI assistant dashboard</p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="calendar">
-          <Card className="modern-card">
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {[
-                  {
-                    date: "12",
-                    month: "JUN",
-                    title: "Design Team Meeting",
-                    time: "10:00 AM - 11:00 AM",
-                    color: "violet",
-                  },
-                  {
-                    date: "12",
-                    month: "JUN",
-                    title: "Client Presentation",
-                    time: "2:00 PM - 3:30 PM",
-                    color: "emerald",
-                  },
-                  { date: "13", month: "JUN", title: "Weekly Team Sync", time: "9:00 AM - 10:00 AM", color: "amber" },
-                ].map((event, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <div
-                      className={cn(
-                        "flex h-14 w-14 flex-col items-center justify-center rounded-xl text-white font-bold",
-                        event.color === "violet" && "bg-gradient-to-r from-violet-500 to-purple-500",
-                        event.color === "emerald" && "bg-gradient-to-r from-emerald-500 to-teal-500",
-                        event.color === "amber" && "bg-gradient-to-r from-amber-500 to-orange-500",
-                      )}
-                    >
-                      <span className="text-xs">{event.month}</span>
-                      <span className="text-lg">{event.date}</span>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-slate-900 dark:text-slate-100">{event.title}</h3>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">{event.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="suggestions">
-          <Card className="modern-card">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-violet-600" />
-                AI-Powered Suggestions
-              </CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={loadAISuggestions}
-                disabled={isLoadingSuggestions}
-                className="flex items-center gap-2 bg-transparent"
-              >
-                <RefreshCw className={cn("h-4 w-4", isLoadingSuggestions && "animate-spin")} />
-                Refresh
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isLoadingSuggestions ? (
-                <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="h-6 w-6 animate-spin text-violet-600 mr-2" />
-                  <span className="text-slate-600 dark:text-slate-300">Generating AI suggestions...</span>
+              <div className="hidden md:flex items-center space-x-4">
+                <div className="text-right">
+                  <div className="text-2xl font-bold">{stats.totalMessages}</div>
+                  <div className="text-white/80 text-sm">Total Messages</div>
                 </div>
-              ) : (
-                aiSuggestions.map((suggestion, index) => (
-                  <div
-                    key={index}
-                    className="rounded-xl bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/50 dark:to-slate-800 p-4 border border-slate-200 dark:border-slate-700"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-violet-500 to-emerald-500 flex items-center justify-center flex-shrink-0 mt-1">
-                        <Sparkles className="h-4 w-4 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-slate-700 dark:text-slate-300 mb-3">{suggestion}</p>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white"
-                          >
-                            Apply
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-slate-300 dark:border-slate-600 bg-transparent"
-                          >
-                            Dismiss
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      <Card className="modern-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-violet-600 to-emerald-600 rounded-lg flex items-center justify-center">
-              <Zap className="h-4 w-4 text-white" />
-            </div>
-            AI Assistant
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="rounded-xl bg-gradient-to-r from-violet-50 to-emerald-50 dark:from-violet-900/20 dark:to-emerald-900/20 p-4 border border-violet-200 dark:border-violet-700">
-              <p className="text-slate-700 dark:text-slate-300">
-                Good morning, George! I see you have client signings scheduled for this morning - perfect timing for
-                your peak energy hours. Would you like me to help prepare your legal documents or suggest an optimal
-                schedule for balancing your law practice, theatre work, and martial arts training today?
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  className="w-full rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 pr-12 text-sm focus:border-violet-500 dark:focus:border-violet-400 focus:outline-none transition-colors"
-                  placeholder="Type a message or use voice input..."
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1 h-8 w-8 hover:bg-violet-100 dark:hover:bg-violet-900/20"
-                  onClick={handleVoiceInput}
-                >
-                  <Mic className={cn("h-4 w-4", isRecording && "text-red-500 animate-pulse")} />
-                </Button>
+                <div className="w-px h-12 bg-white/20" />
+                <div className="text-right">
+                  <div className="text-2xl font-bold">{stats.totalConversations}</div>
+                  <div className="text-white/80 text-sm">Conversations</div>
+                </div>
               </div>
-              <Button className="bg-gradient-to-r from-violet-600 to-emerald-600 hover:from-violet-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 h-12 px-6">
-                <Send className="h-4 w-4" />
-              </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="absolute -top-4 -right-4 w-32 h-32 bg-white/10 rounded-full blur-xl" />
+          <div className="absolute -bottom-8 -left-8 w-40 h-40 bg-white/5 rounded-full blur-2xl" />
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+            <div className="absolute inset-0 bg-gradient-to-r from-violet-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-500 shadow-lg">
+                  <MessageSquare className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {isLoading ? "..." : stats.totalConversations}
+                  </div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Conversations</div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex items-center text-sm text-emerald-600 dark:text-emerald-400">
+                <TrendingUp className="h-4 w-4 mr-1" />
+                {stats.totalMessages} total messages
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 shadow-lg">
+                  <Activity className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {isLoading ? "..." : stats.todayMessages}
+                  </div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">Today</div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div
+                className={cn(
+                  "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border",
+                  activity.bg,
+                  activity.color,
+                  activity.border,
+                )}
+              >
+                {activity.level} Activity
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg">
+                  <Clock className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {isLoading ? "..." : stats.weekMessages}
+                  </div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">This Week</div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="text-sm text-slate-600 dark:text-slate-400">Weekly activity</div>
+            </CardContent>
+          </Card>
+
+          <Card className="group relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-500 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+            <div className="absolute inset-0 bg-gradient-to-r from-pink-500/10 to-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="p-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 shadow-lg">
+                  <Database className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "w-3 h-3 rounded-full",
+                        stats.systemStatus.database && stats.systemStatus.ai ? "bg-emerald-500" : "bg-red-500",
+                      )}
+                    />
+                    <span className="text-sm font-medium text-slate-900 dark:text-white">
+                      {stats.systemStatus.database && stats.systemStatus.ai ? "Online" : "Issues"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="text-sm text-slate-600 dark:text-slate-400">Last checked: {formatTime(lastUpdated)}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid gap-8 lg:grid-cols-3">
+          {/* Recent Conversations */}
+          <div className="lg:col-span-2">
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500">
+                      <MessageSquare className="h-5 w-5 text-white" />
+                    </div>
+                    Recent Conversations
+                  </CardTitle>
+                  <Button
+                    onClick={loadDashboardData}
+                    disabled={isLoading}
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  >
+                    <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {isLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="h-20 bg-slate-100 dark:bg-slate-700 rounded-2xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : stats.recentConversations.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-r from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 flex items-center justify-center">
+                      <MessageSquare className="h-8 w-8 text-violet-600 dark:text-violet-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No conversations yet</h3>
+                    <p className="text-slate-500 dark:text-slate-400 mb-6">Start your first conversation with Thea</p>
+                    <Link href="/dashboard/chat">
+                      <Button className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg">
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Start Chatting
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  stats.recentConversations.map((conversation) => (
+                    <Link key={conversation.id} href="/dashboard/chat">
+                      <div className="group p-4 rounded-2xl bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all duration-300 cursor-pointer border border-transparent hover:border-violet-200 dark:hover:border-violet-800">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+                            <MessageSquare className="h-6 w-6 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-slate-900 dark:text-white truncate group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+                              {conversation.title}
+                            </h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                              {conversation.messageCount} messages •{" "}
+                              {new Date(conversation.updatedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 text-slate-400 group-hover:text-violet-500 transition-colors">
+                            <span className="text-xs">{formatTime(new Date(conversation.updatedAt))}</span>
+                            <ArrowRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Quick Actions & System Status */}
+          <div className="space-y-6">
+            {/* Quick Actions */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500">
+                    <Zap className="h-5 w-5 text-white" />
+                  </div>
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Link href="/dashboard/chat">
+                  <div className="group p-4 rounded-xl bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 border border-violet-100 dark:border-violet-800 hover:shadow-lg transition-all duration-300 cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-r from-violet-600 to-purple-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <MessageSquare className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-slate-900 dark:text-white">New Chat</h3>
+                        <p className="text-xs text-slate-600 dark:text-slate-300">Start conversation</p>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+
+                <Link href="/dashboard/calendar">
+                  <div className="group p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-100 dark:border-emerald-800 hover:shadow-lg transition-all duration-300 cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Calendar className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-slate-900 dark:text-white">Calendar</h3>
+                        <p className="text-xs text-slate-600 dark:text-slate-300">Manage events</p>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+
+                <Link href="/dashboard/settings">
+                  <div className="group p-4 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-100 dark:border-amber-800 hover:shadow-lg transition-all duration-300 cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-r from-amber-600 to-orange-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <User className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-slate-900 dark:text-white">Settings</h3>
+                        <p className="text-xs text-slate-600 dark:text-slate-300">Account preferences</p>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* System Status */}
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500">
+                    <Database className="h-5 w-5 text-white" />
+                  </div>
+                  System Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "w-2 h-2 rounded-full",
+                        stats.systemStatus.database ? "bg-emerald-500" : "bg-red-500",
+                      )}
+                    />
+                    <span className="text-sm font-medium text-slate-900 dark:text-white">Database</span>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-1 rounded-full",
+                      stats.systemStatus.database
+                        ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                        : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300",
+                    )}
+                  >
+                    {stats.systemStatus.database ? "Online" : "Offline"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn("w-2 h-2 rounded-full", stats.systemStatus.ai ? "bg-emerald-500" : "bg-red-500")}
+                    />
+                    <span className="text-sm font-medium text-slate-900 dark:text-white">AI Service</span>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-1 rounded-full",
+                      stats.systemStatus.ai
+                        ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                        : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300",
+                    )}
+                  >
+                    {stats.systemStatus.ai ? "Online" : "Offline"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "w-2 h-2 rounded-full",
+                        stats.systemStatus.calendar ? "bg-emerald-500" : "bg-amber-500",
+                      )}
+                    />
+                    <span className="text-sm font-medium text-slate-900 dark:text-white">Calendar</span>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-1 rounded-full",
+                      stats.systemStatus.calendar
+                        ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                        : "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
+                    )}
+                  >
+                    {stats.systemStatus.calendar ? "Connected" : "Not Connected"}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
