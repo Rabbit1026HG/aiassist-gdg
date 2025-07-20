@@ -72,7 +72,7 @@ export function DeleteEventDialog({ isOpen, onClose, onEventDeleted, event }: De
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-[500px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border border-red-200/50 dark:border-red-800/50 shadow-2xl">
+      <DialogContent className="w-[95vw] max-w-[500px] p-6  bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border border-red-200/50 dark:border-red-800/50 shadow-2xl">
         <DialogHeader className="space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-r from-red-600 to-red-700 rounded-xl flex items-center justify-center flex-shrink-0">
