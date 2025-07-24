@@ -1,434 +1,600 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ModeToggle } from "@/components/mode-toggle"
-import { useAuth } from "@/components/auth/auth-provider"
+import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { User, Shield, Database, Trash2, Download, Save, Calendar } from "lucide-react"
-import { chatStorage } from "@/lib/chat-storage"
+import { ModeToggle } from "@/components/mode-toggle"
+import {
+  User,
+  Bell,
+  Shield,
+  Download,
+  Trash2,
+  Calendar,
+  Brain,
+  Settings,
+  ExternalLink,
+  AlertTriangle,
+  CheckCircle,
+} from "lucide-react"
 
-interface UserSettings {
-  notifications: boolean
-  dataCollection: boolean
-  conversationHistory: boolean
+interface SettingsData {
+  profile: {
+    name: string
+    email: string
+    bio: string
+  }
+  notifications: {
+    emailNotifications: boolean
+    pushNotifications: boolean
+    weeklyDigest: boolean
+  }
+  privacy: {
+    dataCollection: boolean
+    analytics: boolean
+    shareUsage: boolean
+  }
+  integrations: {
+    googleCalendar: boolean
+    googleCalendarStatus: "connected" | "disconnected" | "error"
+  }
+  memory: {
+    totalMemories: number
+    autoSave: boolean
+    contextWindow: number
+  }
 }
 
 export function SettingsForm() {
-  const [settings, setSettings] = useState<UserSettings>({
-    notifications: true,
-    dataCollection: true,
-    conversationHistory: true,
+  const [settings, setSettings] = useState<SettingsData>({
+    profile: {
+      name: "George",
+      email: "george@example.com",
+      bio: "Solo attorney specializing in Wills & Trusts. Passionate about theatre, martial arts, and jazz piano.",
+    },
+    notifications: {
+      emailNotifications: true,
+      pushNotifications: false,
+      weeklyDigest: true,
+    },
+    privacy: {
+      dataCollection: true,
+      analytics: false,
+      shareUsage: false,
+    },
+    integrations: {
+      googleCalendar: false,
+      googleCalendarStatus: "disconnected",
+    },
+    memory: {
+      totalMemories: 0,
+      autoSave: true,
+      contextWindow: 5,
+    },
   })
+
   const [isLoading, setIsLoading] = useState(false)
-  const [calendarStatus, setCalendarStatus] = useState<{ isAuthenticated: boolean; email?: string }>({
-    isAuthenticated: false,
-  })
-  const { user } = useAuth()
+  const [isSaving, setIsSaving] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
     loadSettings()
-    checkCalendarStatus()
   }, [])
 
-  const loadSettings = () => {
+  const loadSettings = async () => {
     try {
-      const savedSettings = localStorage.getItem("user-settings")
-      if (savedSettings) {
-        setSettings(JSON.parse(savedSettings))
-      }
+      setIsLoading(true)
+
+      // Load memory count
+      const memoryResponse = await fetch("/api/memory")
+      const memoryData = await memoryResponse.json()
+      const memoryCount = memoryData.memories?.length || 0
+
+      // Load calendar status
+      const calendarResponse = await fetch("/api/calendar/auth/status")
+      const calendarData = await calendarResponse.json()
+
+      setSettings((prev) => ({
+        ...prev,
+        memory: {
+          ...prev.memory,
+          totalMemories: memoryCount,
+        },
+        integrations: {
+          ...prev.integrations,
+          googleCalendar: calendarData.connected || false,
+          googleCalendarStatus: calendarData.connected ? "connected" : "disconnected",
+        },
+      }))
     } catch (error) {
       console.error("Error loading settings:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const saveSettings = async () => {
-    setIsLoading(true)
+  const handleSaveSettings = async () => {
     try {
-      localStorage.setItem("user-settings", JSON.stringify(settings))
+      setIsSaving(true)
+      // Simulate saving settings
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
       toast({
         title: "Settings saved",
         description: "Your preferences have been updated successfully.",
       })
     } catch (error) {
+      console.error("Error saving settings:", error)
       toast({
         title: "Error",
         description: "Failed to save settings. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setIsSaving(false)
     }
   }
 
-  const checkCalendarStatus = async () => {
+  const handleConnectCalendar = async () => {
     try {
-      const response = await fetch("/api/calendar/auth/status")
+      const response = await fetch("/api/calendar/auth")
       const data = await response.json()
-      setCalendarStatus(data)
-    } catch (error) {
-      console.error("Error checking calendar status:", error)
-    }
-  }
 
-  const handleCalendarConnect = async () => {
-    try {
-      window.location.href = "/api/calendar/auth"
+      if (data.authUrl) {
+        window.location.href = data.authUrl
+      }
     } catch (error) {
+      console.error("Error connecting calendar:", error)
       toast({
         title: "Error",
-        description: "Failed to connect to calendar. Please try again.",
+        description: "Failed to connect Google Calendar. Please try again.",
         variant: "destructive",
       })
     }
   }
 
-  const handleCalendarDisconnect = async () => {
+  const handleDisconnectCalendar = async () => {
     try {
       await fetch("/api/calendar/auth/logout", { method: "POST" })
-      setCalendarStatus({ isAuthenticated: false })
+
+      setSettings((prev) => ({
+        ...prev,
+        integrations: {
+          ...prev.integrations,
+          googleCalendar: false,
+          googleCalendarStatus: "disconnected",
+        },
+      }))
+
       toast({
         title: "Calendar disconnected",
-        description: "Your Google Calendar has been disconnected.",
+        description: "Google Calendar has been disconnected successfully.",
       })
     } catch (error) {
+      console.error("Error disconnecting calendar:", error)
       toast({
         title: "Error",
-        description: "Failed to disconnect calendar. Please try again.",
+        description: "Failed to disconnect Google Calendar. Please try again.",
         variant: "destructive",
       })
     }
   }
 
-  const exportData = async () => {
-    setIsLoading(true)
+  const handleExportData = async () => {
     try {
-      const conversations = await chatStorage.getConversations()
-      const allData = []
+      // Load all data for export
+      const [conversationsRes, memoriesRes, eventsRes] = await Promise.all([
+        fetch("/api/conversations"),
+        fetch("/api/memory"),
+        fetch("/api/calendar/events"),
+      ])
 
-      for (const conversation of conversations) {
-        const messages = await chatStorage.getMessages(conversation.id)
-        allData.push({
-          conversation,
-          messages,
-        })
+      const [conversations, memories, events] = await Promise.all([
+        conversationsRes.json(),
+        memoriesRes.json(),
+        eventsRes.json(),
+      ])
+
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        conversations: conversations.conversations || [],
+        memories: memories.memories || [],
+        events: events.events || [],
+        settings,
       }
 
-      const dataStr = JSON.stringify(allData, null, 2)
-      const dataBlob = new Blob([dataStr], { type: "application/json" })
-      const url = URL.createObjectURL(dataBlob)
-      const link = document.createElement("a")
-      link.href = url
-      link.download = `thea-data-export-${new Date().toISOString().split("T")[0]}.json`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `thea-data-export-${new Date().toISOString().split("T")[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
       toast({
         title: "Data exported",
-        description: "Your data has been downloaded successfully.",
+        description: "Your data has been exported successfully.",
       })
     } catch (error) {
+      console.error("Error exporting data:", error)
       toast({
         title: "Error",
         description: "Failed to export data. Please try again.",
         variant: "destructive",
       })
-    } finally {
-      setIsLoading(false)
     }
   }
 
-  const deleteAllData = async () => {
-    if (!confirm("Are you sure you want to delete all your conversation data? This action cannot be undone.")) {
+  const handleDeleteAllData = async () => {
+    if (!confirm("Are you sure you want to delete all your data? This action cannot be undone.")) {
       return
     }
 
-    setIsLoading(true)
     try {
-      const conversations = await chatStorage.getConversations()
+      // Delete all memories
+      const memoriesResponse = await fetch("/api/memory")
+      const memoriesData = await memoriesResponse.json()
+      const memories = memoriesData.memories || []
+
+      for (const memory of memories) {
+        await fetch(`/api/memory/${memory.id}`, { method: "DELETE" })
+      }
+
+      // Delete all conversations
+      const conversationsResponse = await fetch("/api/conversations")
+      const conversationsData = await conversationsResponse.json()
+      const conversations = conversationsData.conversations || []
+
       for (const conversation of conversations) {
-        await chatStorage.deleteConversation(conversation.id)
+        await fetch(`/api/conversations/${conversation.id}`, { method: "DELETE" })
       }
 
       toast({
-        title: "Data deleted",
-        description: "All your conversation data has been deleted.",
+        title: "All data deleted",
+        description: "Your data has been permanently deleted.",
       })
+
+      // Reload settings to reflect changes
+      loadSettings()
     } catch (error) {
+      console.error("Error deleting data:", error)
       toast({
         title: "Error",
-        description: "Failed to delete data. Please try again.",
+        description: "Failed to delete all data. Please try again.",
         variant: "destructive",
       })
-    } finally {
-      setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 -m-8 p-8">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-violet-600 to-emerald-600 bg-clip-text text-transparent mb-4">
-            Settings
-          </h1>
-          <p className="text-slate-600 dark:text-slate-300 text-lg">
-            Manage your account preferences and privacy settings
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+        <p className="text-muted-foreground">Manage your account settings and preferences.</p>
+      </div>
 
-        <Tabs defaultValue="general" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-lg border-0 p-1 rounded-2xl">
-            <TabsTrigger
-              value="general"
-              className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-500 data-[state=active]:to-purple-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
-            >
-              <User className="h-4 w-4 mr-2" />
-              General
-            </TabsTrigger>
-            <TabsTrigger
-              value="integrations"
-              className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Integrations
-            </TabsTrigger>
-            <TabsTrigger
-              value="privacy"
-              className="rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-pink-500 data-[state=active]:to-rose-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300"
-            >
-              <Shield className="h-4 w-4 mr-2" />
-              Privacy
-            </TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="profile" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="privacy">Privacy</TabsTrigger>
+          <TabsTrigger value="integrations">Integrations</TabsTrigger>
+          <TabsTrigger value="data">Data</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="general" className="space-y-6">
-            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500">
-                    <User className="h-5 w-5 text-white" />
-                  </div>
-                  Account Information
-                </CardTitle>
-                <CardDescription>Your personal account details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-500 flex items-center justify-center text-white font-bold text-xl">
-                      {user?.name?.charAt(0) || "U"}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{user?.name || "User"}</h3>
-                      <p className="text-slate-600 dark:text-slate-300">{user?.email || "user@example.com"}</p>
-                    </div>
+        <TabsContent value="profile" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Profile Information
+              </CardTitle>
+              <CardDescription>Update your personal information and preferences.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={settings.profile.name}
+                    onChange={(e) =>
+                      setSettings((prev) => ({
+                        ...prev,
+                        profile: { ...prev.profile, name: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={settings.profile.email}
+                    onChange={(e) =>
+                      setSettings((prev) => ({
+                        ...prev,
+                        profile: { ...prev.profile, email: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  value={settings.profile.bio}
+                  onChange={(e) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      profile: { ...prev.profile, bio: e.target.value },
+                    }))
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Theme</Label>
+                  <p className="text-sm text-muted-foreground">Choose your preferred theme</p>
+                </div>
+                <ModeToggle />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Notification Preferences
+              </CardTitle>
+              <CardDescription>Configure how you want to be notified.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Email Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Receive notifications via email</p>
+                </div>
+                <Switch
+                  checked={settings.notifications.emailNotifications}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      notifications: { ...prev.notifications, emailNotifications: checked },
+                    }))
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Push Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Receive push notifications in your browser</p>
+                </div>
+                <Switch
+                  checked={settings.notifications.pushNotifications}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      notifications: { ...prev.notifications, pushNotifications: checked },
+                    }))
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Weekly Digest</Label>
+                  <p className="text-sm text-muted-foreground">Receive a weekly summary of your activity</p>
+                </div>
+                <Switch
+                  checked={settings.notifications.weeklyDigest}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      notifications: { ...prev.notifications, weeklyDigest: checked },
+                    }))
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="privacy" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Privacy Settings
+              </CardTitle>
+              <CardDescription>Control your privacy and data usage preferences.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Data Collection</Label>
+                  <p className="text-sm text-muted-foreground">Allow collection of usage data to improve the service</p>
+                </div>
+                <Switch
+                  checked={settings.privacy.dataCollection}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      privacy: { ...prev.privacy, dataCollection: checked },
+                    }))
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Analytics</Label>
+                  <p className="text-sm text-muted-foreground">Enable analytics to help us understand usage patterns</p>
+                </div>
+                <Switch
+                  checked={settings.privacy.analytics}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      privacy: { ...prev.privacy, analytics: checked },
+                    }))
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Share Usage Data</Label>
+                  <p className="text-sm text-muted-foreground">Share anonymized usage data with third parties</p>
+                </div>
+                <Switch
+                  checked={settings.privacy.shareUsage}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      privacy: { ...prev.privacy, shareUsage: checked },
+                    }))
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="integrations" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ExternalLink className="h-5 w-5" />
+                Integrations
+              </CardTitle>
+              <CardDescription>Connect external services to enhance your experience.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-8 w-8 text-blue-600" />
+                  <div>
+                    <h3 className="font-medium">Google Calendar</h3>
+                    <p className="text-sm text-muted-foreground">Sync your calendar events with Thea</p>
                   </div>
                 </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-700/50">
-                    <div>
-                      <Label className="text-base font-medium">Theme</Label>
-                      <p className="text-sm text-slate-600 dark:text-slate-300">Choose your preferred theme</p>
-                    </div>
-                    <ModeToggle />
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-700/50">
-                    <div>
-                      <Label className="text-base font-medium">Browser Notifications</Label>
-                      <p className="text-sm text-slate-600 dark:text-slate-300">
-                        Receive notifications in your browser
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.notifications}
-                      onCheckedChange={(checked) => setSettings({ ...settings, notifications: checked })}
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <Button
-                    onClick={saveSettings}
-                    disabled={isLoading}
-                    className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {isLoading ? "Saving..." : "Save Settings"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="integrations" className="space-y-6">
-            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500">
-                    <Calendar className="h-5 w-5 text-white" />
-                  </div>
-                  Google Calendar
-                </CardTitle>
-                <CardDescription>Connect your Google Calendar to manage events with AI</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center">
-                        <Calendar className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-slate-900 dark:text-white">
-                          {calendarStatus.isAuthenticated ? "Connected" : "Not Connected"}
-                        </h3>
-                        <p className="text-sm text-slate-600 dark:text-slate-300">
-                          {calendarStatus.isAuthenticated
-                            ? `Connected as ${calendarStatus.email || "Google Account"}`
-                            : "Connect to manage calendar events with AI"}
-                        </p>
-                      </div>
-                    </div>
-                    {calendarStatus.isAuthenticated ? (
-                      <Button
-                        onClick={handleCalendarDisconnect}
-                        variant="outline"
-                        className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 bg-transparent"
-                      >
-                        Disconnect
-                      </Button>
+                <div className="flex items-center gap-2">
+                  <Badge variant={settings.integrations.googleCalendarStatus === "connected" ? "default" : "secondary"}>
+                    {settings.integrations.googleCalendarStatus === "connected" ? (
+                      <>
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Connected
+                      </>
                     ) : (
-                      <Button
-                        onClick={handleCalendarConnect}
-                        className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
-                      >
-                        Connect
-                      </Button>
+                      "Disconnected"
                     )}
+                  </Badge>
+                  {settings.integrations.googleCalendar ? (
+                    <Button variant="outline" size="sm" onClick={handleDisconnectCalendar}>
+                      Disconnect
+                    </Button>
+                  ) : (
+                    <Button size="sm" onClick={handleConnectCalendar}>
+                      Connect
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Brain className="h-8 w-8 text-purple-600" />
+                  <div>
+                    <h3 className="font-medium">Memory System</h3>
+                    <p className="text-sm text-muted-foreground">{settings.memory.totalMemories} memories stored</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="privacy" className="space-y-6">
-            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500">
-                    <Shield className="h-5 w-5 text-white" />
-                  </div>
-                  Privacy Settings
-                </CardTitle>
-                <CardDescription>Control how your data is used and stored</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-700/50">
-                    <div>
-                      <Label className="text-base font-medium">Usage Analytics</Label>
-                      <p className="text-sm text-slate-600 dark:text-slate-300">
-                        Help improve the service by sharing anonymous usage data
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.dataCollection}
-                      onCheckedChange={(checked) => setSettings({ ...settings, dataCollection: checked })}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-700/50">
-                    <div>
-                      <Label className="text-base font-medium">Conversation History</Label>
-                      <p className="text-sm text-slate-600 dark:text-slate-300">
-                        Store conversation history for better AI assistance
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.conversationHistory}
-                      onCheckedChange={(checked) => setSettings({ ...settings, conversationHistory: checked })}
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <Button
-                    onClick={saveSettings}
-                    disabled={isLoading}
-                    className="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white shadow-lg"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {isLoading ? "Saving..." : "Save Privacy Settings"}
+                <div className="flex items-center gap-2">
+                  <Badge variant="default">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Active
+                  </Badge>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href="/dashboard/memory">Manage</a>
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <Card className="border-0 shadow-xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500">
-                    <Database className="h-5 w-5 text-white" />
+        <TabsContent value="data" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Data Management
+              </CardTitle>
+              <CardDescription>Export or delete your data.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h3 className="font-medium">Export Data</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Download all your conversations, memories, and settings
+                    </p>
                   </div>
-                  Data Management
-                </CardTitle>
-                <CardDescription>Export or delete your personal data</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base font-medium text-amber-800 dark:text-amber-200">Export Data</Label>
-                      <p className="text-sm text-amber-700 dark:text-amber-300">
-                        Download all your conversations and data
-                      </p>
-                    </div>
-                    <Button
-                      onClick={exportData}
-                      disabled={isLoading}
-                      variant="outline"
-                      className="border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/30 bg-transparent"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
-                    </Button>
-                  </div>
+                  <Button variant="outline" onClick={handleExportData}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-base font-medium text-red-800 dark:text-red-200">Delete All Data</Label>
-                      <p className="text-sm text-red-700 dark:text-red-300">
-                        Permanently delete all your conversations and data
-                      </p>
-                    </div>
-                    <Button
-                      onClick={deleteAllData}
-                      disabled={isLoading}
-                      variant="outline"
-                      className="border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/30 bg-transparent"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete All
-                    </Button>
+                <div className="flex items-center justify-between p-4 border rounded-lg border-destructive/20">
+                  <div>
+                    <h3 className="font-medium text-destructive">Delete All Data</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Permanently delete all your conversations, memories, and settings
+                    </p>
+                  </div>
+                  <Button variant="destructive" onClick={handleDeleteAllData}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete All
+                  </Button>
+                </div>
+              </div>
+
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium">Data Usage Information</h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Your data is stored securely and used only to provide personalized assistance. We do not share
+                      your personal information with third parties without your consent.
+                    </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <div className="flex justify-end">
+        <Button onClick={handleSaveSettings} disabled={isSaving}>
+          {isSaving ? "Saving..." : "Save Settings"}
+        </Button>
       </div>
     </div>
   )
