@@ -275,7 +275,7 @@ export function MemoryManager() {
               Add Memory
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl p-6">
             <DialogHeader>
               <DialogTitle>Create New Memory</DialogTitle>
               <DialogDescription>
@@ -483,7 +483,7 @@ export function MemoryManager() {
 
       {/* Edit Dialog */}
       <Dialog open={!!editingMemory} onOpenChange={(open) => !open && cancelEditing()}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl p-6">
           <DialogHeader>
             <DialogTitle>Edit Memory</DialogTitle>
             <DialogDescription>Update the information for Thea to remember</DialogDescription>

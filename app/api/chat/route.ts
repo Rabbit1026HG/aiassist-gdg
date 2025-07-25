@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
     if (lastMessage?.role === "user") {
       try {
-        contextualInfo = await memoryService.getRelevantContext(FIXED_USER_ID, lastMessage.content)
+        contextualInfo = await memoryService.getRelevantContext( lastMessage.content)
       } catch (error) {
         console.error("Error getting contextual info:", error)
         // Continue without context if memory service fails

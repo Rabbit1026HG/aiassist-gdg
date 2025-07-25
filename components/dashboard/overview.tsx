@@ -12,7 +12,7 @@ interface DashboardStats {
   totalConversations: number
   totalMessages: number
   totalMemories: number
-  upcomingEvents: number
+  // upcomingEvents: number
   activeProjects: number
   recentActivity: Array<{
     id: string
@@ -28,7 +28,7 @@ export function DashboardOverview() {
     totalConversations: 0,
     totalMessages: 0,
     totalMemories: 0,
-    upcomingEvents: 0,
+    // upcomingEvents: 0,
     activeProjects: 3,
     recentActivity: [],
   })
@@ -100,8 +100,6 @@ export function DashboardOverview() {
         totalConversations: conversations.length,
         totalMessages,
         totalMemories: memories.length,
-        upcomingEvents: events.filter((event: any) => new Date(event.start?.dateTime || event.start?.date) > new Date())
-          .length,
         activeProjects: 3, // Static for now
         recentActivity,
       })
@@ -171,7 +169,7 @@ export function DashboardOverview() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Conversations</CardTitle>
@@ -191,17 +189,6 @@ export function DashboardOverview() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalMemories}</div>
             <p className="text-xs text-muted-foreground">Information Thea remembers about you</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.upcomingEvents}</div>
-            <p className="text-xs text-muted-foreground">Events in your calendar</p>
           </CardContent>
         </Card>
 

@@ -2,7 +2,6 @@ import { supabase } from "./supabase"
 
 export interface Memory {
   id: string
-  user_id: string
   title: string
   content: string
   type: "resume" | "document" | "preference" | "context" | "file"
@@ -54,13 +53,12 @@ class MemoryService {
     }
   }
 
-  async createMemory(userId: string, input: CreateMemoryInput): Promise<Memory> {
+  async createMemory(input: CreateMemoryInput): Promise<Memory> {
     try {
       // Generate embedding for the content
       const embedding = await this.generateEmbedding(`${input.title} ${input.content}`)
 
       const insertData: any = {
-        user_id: userId,
         title: input.title,
         content: input.content,
         type: input.type,
@@ -72,7 +70,7 @@ class MemoryService {
         insertData.embedding = embedding
       }
 
-      const { data, error } = await supabase.from("user_memories").insert(insertData).select().single()
+      const { data, error } = await supabase.from("memories").insert(insertData).select().single()
 
       if (error) {
         console.error("Supabase error:", error)
@@ -85,13 +83,9 @@ class MemoryService {
     }
   }
 
-  async getMemories(userId: string, type?: Memory["type"]): Promise<Memory[]> {
+  async getMemories(type?: Memory["type"]): Promise<Memory[]> {
     try {
-      let query = supabase
-        .from("user_memories")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
+      let query = supabase.from("memories").select("*").order("created_at", { ascending: false })
 
       if (type) {
         query = query.eq("type", type)
@@ -110,14 +104,9 @@ class MemoryService {
     }
   }
 
-  async getMemory(userId: string, memoryId: string): Promise<Memory | null> {
+  async getMemory(memoryId: string): Promise<Memory | null> {
     try {
-      const { data, error } = await supabase
-        .from("user_memories")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("id", memoryId)
-        .single()
+      const { data, error } = await supabase.from("memories").select("*").eq("id", memoryId).single()
 
       if (error) {
         if (error.code === "PGRST116") return null // Not found
@@ -131,13 +120,13 @@ class MemoryService {
     }
   }
 
-  async updateMemory(userId: string, memoryId: string, updates: Partial<CreateMemoryInput>): Promise<Memory> {
+  async updateMemory(memoryId: string, updates: Partial<CreateMemoryInput>): Promise<Memory> {
     try {
       const updateData: any = { ...updates }
 
       // If content or title changed, regenerate embedding
       if (updates.title || updates.content) {
-        const currentMemory = await this.getMemory(userId, memoryId)
+        const currentMemory = await this.getMemory(memoryId)
         if (!currentMemory) throw new Error("Memory not found")
 
         const newTitle = updates.title || currentMemory.title
@@ -148,14 +137,8 @@ class MemoryService {
           updateData.embedding = embedding
         }
       }
-
-      const { data, error } = await supabase
-        .from("user_memories")
-        .update(updateData)
-        .eq("user_id", userId)
-        .eq("id", memoryId)
-        .select()
-        .single()
+console.log("Update data", updateData)
+      const { data, error } = await supabase.from("memories").update(updateData).eq("id", memoryId).select().single()
 
       if (error) {
         console.error("Supabase error:", error)
@@ -168,9 +151,9 @@ class MemoryService {
     }
   }
 
-  async deleteMemory(userId: string, memoryId: string): Promise<void> {
+  async deleteMemory(memoryId: string): Promise<void> {
     try {
-      const { error } = await supabase.from("user_memories").delete().eq("user_id", userId).eq("id", memoryId)
+      const { error } = await supabase.from("memories").delete().eq("id", memoryId)
 
       if (error) {
         console.error("Supabase error:", error)
@@ -183,7 +166,6 @@ class MemoryService {
   }
 
   async searchMemories(
-    userId: string,
     query: string,
     options: {
       threshold?: number
@@ -196,19 +178,18 @@ class MemoryService {
 
       // Try vector search first
       const queryEmbedding = await this.generateEmbedding(query)
-      console.log("------------------------")
-      console.log(userId, query, options,queryEmbedding);
-      console.log("------------------------")
-
+console.log("-------------------------------------------");
+console.log(query, options, queryEmbedding)
       if (queryEmbedding) {
         try {
           const { data, error } = await supabase.rpc("search_memories", {
             query_embedding: queryEmbedding,
             match_threshold: threshold,
             match_count: limit,
-            filter_user_id: userId,
           })
-console.log(data,error)
+          console.log(data,error);
+          console.log("-------------------------------------------");
+
           if (!error && data) {
             let results = data || []
 
@@ -225,16 +206,15 @@ console.log(data,error)
       }
 
       // Fallback to text search
-      return this.fallbackTextSearch(userId, query, options)
+      return this.fallbackTextSearch(query, options)
     } catch (error) {
       console.error("Error searching memories:", error)
       // Final fallback to text search
-      return this.fallbackTextSearch(userId, query, options)
+      return this.fallbackTextSearch(query, options)
     }
   }
 
   private async fallbackTextSearch(
-    userId: string,
     query: string,
     options: { type?: Memory["type"]; limit?: number } = {},
   ): Promise<SearchResult[]> {
@@ -242,9 +222,8 @@ console.log(data,error)
       const { type, limit = 10 } = options
 
       let supabaseQuery = supabase
-        .from("user_memories")
+        .from("memories")
         .select("*")
-        .eq("user_id", userId)
         .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
         .order("created_at", { ascending: false })
         .limit(limit)
@@ -271,9 +250,9 @@ console.log(data,error)
     }
   }
 
-  async getRelevantContext(userId: string, query: string, limit = 5): Promise<string> {
+  async getRelevantContext(query: string, limit = 5): Promise<string> {
     try {
-      const memories = await this.searchMemories(userId, query, {
+      const memories = await this.searchMemories(query, {
         threshold: 0.6,
         limit,
       })

@@ -1,11 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { memoryService } from "@/lib/memory-service"
 
-const FIXED_USER_ID = "00000000-0000-0000-0000-000000001026"
-
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const memory = await memoryService.getMemory(FIXED_USER_ID, params.id)
+    const memory = await memoryService.getMemory(params.id)
 
     if (!memory) {
       return NextResponse.json({ error: "Memory not found" }, { status: 404 })
@@ -29,7 +27,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const body = await request.json()
     const { title, content, type, metadata } = body
 
-    const memory = await memoryService.updateMemory(FIXED_USER_ID, params.id, {
+    const memory = await memoryService.updateMemory(params.id, {
       title,
       content,
       type,
@@ -51,7 +49,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await memoryService.deleteMemory(FIXED_USER_ID, params.id)
+    await memoryService.deleteMemory(params.id)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error deleting memory:", error)

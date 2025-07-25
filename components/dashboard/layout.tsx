@@ -19,13 +19,14 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { ModeToggle } from "@/components/mode-toggle"
 import { ChangePasswordDialog } from "@/components/auth/change-password-dialog"
 import { useAuth } from "@/components/auth/auth-provider"
-import { Calendar, Home, MessageSquare, Settings, Menu, LogOut, KeyRound } from "lucide-react"
+import { Calendar, Home, MessageSquare, Settings, Menu, LogOut, KeyRound, Brain } from "lucide-react"
 import Image from "next/image"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "AI Chat", href: "/dashboard/chat", icon: MessageSquare },
   { name: "Calendar", href: "/dashboard/calendar", icon: Calendar },
+  { name: "Memory", href: "/dashboard/memory", icon: Brain },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ]
 
